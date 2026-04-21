@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>AudioDisk - Мессенджер</title>
+    <title>AudioDisk - Полный функционал</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; }
         
         body {
             font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
@@ -20,40 +20,23 @@
             overflow: hidden;
         }
         
-        /* Млечный путь - звездный фон */
-        body::before {
-            content: '';
+        /* Звездный фон */
+        #stars-canvas {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background-image: 
-                radial-gradient(2px 2px at 20px 30px, #fff, rgba(0,0,0,0)),
-                radial-gradient(1px 1px at 60px 80px, #fff, rgba(0,0,0,0)),
-                radial-gradient(3px 3px at 120px 50px, #fff, rgba(0,0,0,0)),
-                radial-gradient(2px 2px at 200px 150px, #fff, rgba(0,0,0,0)),
-                radial-gradient(1px 1px at 300px 250px, #fff, rgba(0,0,0,0)),
-                radial-gradient(2px 2px at 400px 100px, #fff, rgba(0,0,0,0)),
-                radial-gradient(3px 3px at 500px 300px, #fff, rgba(0,0,0,0)),
-                radial-gradient(1px 1px at 600px 180px, #fff, rgba(0,0,0,0)),
-                radial-gradient(2px 2px at 700px 400px, #fff, rgba(0,0,0,0)),
-                radial-gradient(1px 1px at 800px 50px, #fff, rgba(0,0,0,0));
-            background-size: 200px 200px;
-            background-repeat: repeat;
-            opacity: 0.4;
             pointer-events: none;
             z-index: 0;
         }
         
-        /* Стеклянная панель */
+        /* Стекло */
         .glass {
             background: rgba(255, 255, 255, 0.08);
             backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
             border: 1px solid rgba(255, 255, 255, 0.15);
             border-radius: 20px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
         }
         
         .header {
@@ -87,6 +70,13 @@
         .menu-btn:hover, .avatar:hover {
             background: rgba(255, 255, 255, 0.25);
             transform: scale(1.05);
+            animation: sparkle 0.5s ease;
+        }
+        
+        @keyframes sparkle {
+            0% { box-shadow: 0 0 0 0 rgba(102,126,234,0.7); }
+            70% { box-shadow: 0 0 0 15px rgba(102,126,234,0); }
+            100% { box-shadow: 0 0 0 0 rgba(102,126,234,0); }
         }
         
         h2 { font-weight: 600; letter-spacing: 1px; text-shadow: 0 0 10px rgba(102,126,234,0.5); }
@@ -160,12 +150,24 @@
             border: 1px solid rgba(255, 255, 255, 0.1);
             cursor: pointer;
             transition: all 0.3s;
+            position: relative;
         }
         
         .contact-item:hover {
             background: rgba(255, 255, 255, 0.12);
             transform: translateX(4px);
             border-color: rgba(102,126,234,0.5);
+        }
+        
+        .online-indicator {
+            position: absolute;
+            bottom: 2px;
+            right: 2px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #4CAF50;
+            border: 2px solid white;
         }
         
         .contact-avatar {
@@ -179,6 +181,7 @@
             margin-right: 12px;
             font-size: 24px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            position: relative;
         }
         
         .chat-container {
@@ -203,6 +206,17 @@
             align-items: center;
             gap: 16px;
             border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .call-btn {
+            background: #4CAF50;
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(76,175,80,0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(76,175,80,0); }
+            100% { box-shadow: 0 0 0 0 rgba(76,175,80,0); }
         }
         
         .messages {
@@ -243,6 +257,20 @@
             font-size: 10px;
             opacity: 0.7;
             margin-top: 4px;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        
+        .read-receipt {
+            font-size: 12px;
+        }
+        
+        .typing-indicator {
+            font-size: 12px;
+            opacity: 0.7;
+            padding: 4px 12px;
+            font-style: italic;
         }
         
         .bottom-panel {
@@ -282,6 +310,7 @@
         .btn-icon:hover {
             transform: scale(1.05);
             box-shadow: 0 6px 15px rgba(102,126,234,0.4);
+            animation: sparkle 0.5s ease;
         }
         
         #map {
@@ -293,12 +322,10 @@
             border: 1px solid rgba(255, 255, 255, 0.2);
         }
         
-        /* Скрываем рекламу карты */
         .leaflet-control-attribution {
             display: none !important;
         }
         
-        /* Задвигаем низ карты */
         .leaflet-bottom {
             bottom: -50px !important;
         }
@@ -328,6 +355,16 @@
             max-width: 400px;
             border: 1px solid rgba(255, 255, 255, 0.2);
             box-shadow: 0 25px 50px rgba(0,0,0,0.5);
+            position: relative;
+        }
+        
+        .modal-close {
+            position: absolute;
+            top: 12px;
+            right: 16px;
+            font-size: 24px;
+            cursor: pointer;
+            color: rgba(255,255,255,0.6);
         }
         
         .modal input, .modal select {
@@ -342,12 +379,6 @@
             outline: none;
         }
         
-        .modal input:focus, .modal select:focus {
-            border-color: #667eea;
-            box-shadow: 0 0 10px rgba(102,126,234,0.3);
-        }
-        
-        /* Уведомление */
         .toast {
             position: fixed;
             bottom: 80px;
@@ -381,21 +412,15 @@
             margin: 8px 0;
             border-radius: 16px;
             border: 1px solid rgba(255, 255, 255, 0.1);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        
-        .ad-card button {
-            background: rgba(102,126,234,0.3);
-            border: none;
-            padding: 6px 12px;
-            border-radius: 20px;
-            color: white;
             cursor: pointer;
+            transition: all 0.3s;
         }
         
-        /* Сендвич-панель (меню) */
+        .ad-card:hover {
+            background: rgba(102,126,234,0.2);
+            transform: translateX(4px);
+        }
+        
         .side-menu {
             position: fixed;
             top: 0;
@@ -442,6 +467,27 @@
         .menu-item:hover {
             background: rgba(102,126,234,0.3);
             transform: translateX(8px);
+            animation: sparkle 0.5s ease;
+        }
+        
+        .filter-bar {
+            display: flex;
+            gap: 8px;
+            margin: 12px 0;
+            flex-wrap: wrap;
+        }
+        
+        .filter-btn {
+            background: rgba(255,255,255,0.1);
+            border: none;
+            padding: 8px 16px;
+            border-radius: 30px;
+            color: white;
+            cursor: pointer;
+        }
+        
+        .filter-btn.active {
+            background: linear-gradient(135deg, #667eea, #764ba2);
         }
         
         ::-webkit-scrollbar {
@@ -457,9 +503,17 @@
             background: linear-gradient(135deg, #667eea, #764ba2);
             border-radius: 10px;
         }
+        
+        @media (max-width: 768px) {
+            .side-menu {
+                width: 70%;
+            }
+        }
     </style>
 </head>
 <body>
+
+<canvas id="stars-canvas"></canvas>
 
 <div class="header">
     <button class="menu-btn" onclick="toggleMenu()">☰</button>
@@ -480,6 +534,12 @@
 
 <div id="page-map" class="page">
     <div id="map"></div>
+    <div class="filter-bar">
+        <button class="filter-btn active" data-filter="all" onclick="filterAdsByCategory('all')">Все</button>
+        <button class="filter-btn" data-filter="low" onclick="filterAdsByCategory('low')">До 1000₽</button>
+        <button class="filter-btn" data-filter="mid" onclick="filterAdsByCategory('mid')">1000-5000₽</button>
+        <button class="filter-btn" data-filter="high" onclick="filterAdsByCategory('high')">От 5000₽</button>
+    </div>
     <div style="display: flex; gap: 8px; margin: 12px 0;">
         <input type="text" id="adSearch" placeholder="🔍 Поиск объявлений..." style="flex:1; padding:12px; border-radius:30px; border:none; background:rgba(255,255,255,0.1); color:white;">
         <button class="btn-icon" onclick="showAddAdModal()">➕</button>
@@ -497,8 +557,10 @@
     <div class="chat-header">
         <button class="btn-icon" onclick="closeChat()" style="background:none; box-shadow:none;">←</button>
         <div style="flex:1"><div id="chatName" style="font-weight:bold"></div><div id="chatLogin" style="font-size:11px; opacity:0.7"></div></div>
+        <button class="btn-icon call-btn" onclick="startCall()">📞</button>
     </div>
     <div class="messages" id="messages"></div>
+    <div class="typing-indicator" id="typingIndicator" style="display:none;">✍️ Печатает...</div>
     <div class="bottom-panel">
         <button class="btn-icon" onclick="selectFile()">📎</button>
         <button class="btn-icon" id="recordBtn" onclick="toggleRecording()">🎤</button>
@@ -508,17 +570,17 @@
     </div>
 </div>
 
-<!-- Сендвич-панель -->
-<div class="menu-overlay" id="menuOverlay" onclick="closeMenu()"></div>
 <div class="side-menu" id="sideMenu">
     <div class="menu-item" onclick="showProfile(); closeMenu()">👤 Мой профиль</div>
     <div class="menu-item" onclick="showMyAds(); closeMenu()">📋 Мои объявления</div>
     <div class="menu-item" onclick="switchPage('map'); closeMenu();">🗺️ Карта</div>
     <div class="menu-item" onclick="logout(); closeMenu()">🚪 Выйти</div>
 </div>
+<div class="menu-overlay" id="menuOverlay" onclick="closeMenu()"></div>
 
 <div id="authModal" class="modal active">
     <div class="modal-content">
+        <span class="modal-close" onclick="closeModal('authModal')">✕</span>
         <h2 style="text-align:center">✨ AudioDisk</h2>
         <input type="text" id="loginInput" placeholder="Логин">
         <input type="password" id="passwordInput" placeholder="Пароль">
@@ -531,6 +593,7 @@
 
 <div id="addContactModal" class="modal">
     <div class="modal-content">
+        <span class="modal-close" onclick="closeModal('addContactModal')">✕</span>
         <h3>➕ Добавить контакт</h3>
         <input type="text" id="contactLoginInput" placeholder="Логин друга">
         <button class="btn-icon" onclick="addContact()" style="width:100%; border-radius:30px;">Найти и добавить</button>
@@ -539,6 +602,7 @@
 
 <div id="addAdModal" class="modal">
     <div class="modal-content">
+        <span class="modal-close" onclick="closeModal('addAdModal')">✕</span>
         <h3>📢 Новое объявление</h3>
         <input type="text" id="adTitle" placeholder="Что продаёте?">
         <input type="text" id="adPrice" placeholder="Цена">
@@ -548,6 +612,7 @@
 
 <div id="myAdsModal" class="modal">
     <div class="modal-content">
+        <span class="modal-close" onclick="closeModal('myAdsModal')">✕</span>
         <h3>📋 Мои объявления</h3>
         <div id="myAdsList" style="max-height: 60vh; overflow-y: auto;"></div>
         <button class="btn-icon" onclick="closeModal('myAdsModal')" style="width:100%; margin-top:12px;">Закрыть</button>
@@ -579,6 +644,46 @@
     let mediaRecorder = null;
     let userMarker = null;
     let watchId = null;
+    let currentFilter = 'all';
+    let typingTimeout = null;
+    
+    // ========== ЗВЕЗДЫ НА ФОНЕ ==========
+    function initStars() {
+        const canvas = document.getElementById('stars-canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        
+        const stars = [];
+        for (let i = 0; i < 100; i++) {
+            stars.push({
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
+                radius: Math.random() * 2,
+                alpha: Math.random(),
+                speed: 0.5 + Math.random() * 2
+            });
+        }
+        
+        function drawStars() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for (const star of stars) {
+                ctx.beginPath();
+                ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(255, 255, 255, ${star.alpha})`;
+                ctx.fill();
+                star.y += star.speed;
+                if (star.y > canvas.height) star.y = 0;
+            }
+            requestAnimationFrame(drawStars);
+        }
+        
+        drawStars();
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+    }
     
     // ========== УВЕДОМЛЕНИЕ ==========
     function showToast(msg, isError = false) {
@@ -661,7 +766,7 @@
         location.reload();
     }
     
-    // ========== ГЕОЛОКАЦИЯ В РЕАЛЬНОМ ВРЕМЕНИ ==========
+    // ========== ГЕОЛОКАЦИЯ ==========
     function startGeoWatch() {
         if (!navigator.geolocation) return;
         watchId = navigator.geolocation.watchPosition(async (pos) => {
@@ -670,13 +775,18 @@
                 userMarker.setLatLng([latitude, longitude]);
                 map.setView([latitude, longitude], 15);
             }
-            // Обновляем позицию пользователя в Firebase
             if (currentUser) {
                 await db.ref(`users/${currentUser.id}/location`).set({ lat: latitude, lng: longitude, updated: Date.now() });
-                // Обновляем видимость объявлений (показываем только те, что рядом)
                 await loadAds();
             }
         }, () => showToast('⚠️ Включите геолокацию', true), { enableHighAccuracy: true });
+    }
+    
+    // ========== ЗВОНКИ ==========
+    function startCall() {
+        if (!currentChat) return;
+        showToast(`📞 Звонок пользователю ${currentChat.name}...`);
+        // Здесь будет WebRTC интеграция
     }
     
     // ========== АУДИО ==========
@@ -707,7 +817,7 @@
     async function sendAudioMessage(base64) {
         if (!currentChat) return;
         const msgId = Date.now().toString();
-        const msgData = { from: currentUser.id, to: currentChat.id, type: 'audio', content: base64, timestamp: Date.now() };
+        const msgData = { from: currentUser.id, to: currentChat.id, type: 'audio', content: base64, timestamp: Date.now(), read: false };
         await db.ref(`messages/${currentChat.id}/${currentUser.id}/${msgId}`).set(msgData);
         await db.ref(`messages/${currentUser.id}/${currentChat.id}/${msgId}`).set(msgData);
         loadMessages();
@@ -722,7 +832,7 @@
         const reader = new FileReader();
         reader.onload = async (ev) => {
             const msgId = Date.now().toString();
-            const msgData = { from: currentUser.id, to: currentChat.id, type: 'file', name: file.name, content: ev.target.result, timestamp: Date.now() };
+            const msgData = { from: currentUser.id, to: currentChat.id, type: 'file', name: file.name, content: ev.target.result, timestamp: Date.now(), read: false };
             await db.ref(`messages/${currentChat.id}/${currentUser.id}/${msgId}`).set(msgData);
             await db.ref(`messages/${currentUser.id}/${currentChat.id}/${msgId}`).set(msgData);
             loadMessages();
@@ -735,11 +845,24 @@
         const text = document.getElementById('messageInput').value.trim();
         if (!text || !currentChat) return;
         const msgId = Date.now().toString();
-        const msgData = { from: currentUser.id, to: currentChat.id, type: 'text', content: text, timestamp: Date.now() };
+        const msgData = { from: currentUser.id, to: currentChat.id, type: 'text', content: text, timestamp: Date.now(), read: false };
         await db.ref(`messages/${currentChat.id}/${currentUser.id}/${msgId}`).set(msgData);
         await db.ref(`messages/${currentUser.id}/${currentChat.id}/${msgId}`).set(msgData);
         document.getElementById('messageInput').value = '';
         loadMessages();
+        sendTypingStop();
+    }
+    
+    function sendTypingStart() {
+        if (!currentChat) return;
+        db.ref(`typing/${currentChat.id}/${currentUser.id}`).set(true);
+        if (typingTimeout) clearTimeout(typingTimeout);
+        typingTimeout = setTimeout(() => sendTypingStop(), 2000);
+    }
+    
+    function sendTypingStop() {
+        if (!currentChat) return;
+        db.ref(`typing/${currentChat.id}/${currentUser.id}`).remove();
     }
     
     async function loadMessages() {
@@ -755,10 +878,23 @@
                 <div>${msg.type === 'text' ? escapeHtml(msg.content) : 
                      msg.type === 'audio' ? `<audio controls src="${msg.content}"></audio>` : 
                      `<a href="${msg.content}" download="${msg.name}" style="color:white;">📎 ${msg.name}</a>`}</div>
-                <div class="message-meta">${msg.from === currentUser.id ? 'Вы' : currentChat.name} • ${new Date(msg.timestamp).toLocaleTimeString()}</div>
+                <div class="message-meta">
+                    <span>${msg.from === currentUser.id ? 'Вы' : currentChat.name}</span>
+                    <span>${new Date(msg.timestamp).toLocaleTimeString()}</span>
+                    <span class="read-receipt">${msg.read ? '✓✓' : '✓'}</span>
+                </div>
             </div>
         `).join('');
         container.scrollTop = container.scrollHeight;
+        
+        // Отметить как прочитанные
+        const unreadSnapshot = await db.ref(`messages/${currentUser.id}/${currentChat.id}`).orderByChild('read').equalTo(false).once('value');
+        unreadSnapshot.forEach(async (child) => {
+            if (child.val().from !== currentUser.id) {
+                await db.ref(`messages/${currentUser.id}/${currentChat.id}/${child.key}/read`).set(true);
+                await db.ref(`messages/${currentChat.id}/${currentUser.id}/${child.key}/read`).set(true);
+            }
+        });
     }
     
     // ========== КОНТАКТЫ ==========
@@ -804,6 +940,18 @@
             }
         }
         renderChats();
+        setupTypingListeners();
+    }
+    
+    function setupTypingListeners() {
+        if (!currentUser) return;
+        db.ref('typing').off();
+        db.ref('typing').on('value', (snapshot) => {
+            const typing = document.getElementById('typingIndicator');
+            if (!currentChat) { typing.style.display = 'none'; return; }
+            const isTyping = snapshot.val()?.[currentChat.id]?.[currentUser.id] === true;
+            typing.style.display = isTyping ? 'block' : 'none';
+        });
     }
     
     function openChat(contact) {
@@ -816,11 +964,17 @@
         const ref = db.ref(`messages/${currentUser.id}/${contact.id}`);
         ref.off();
         ref.on('child_added', () => loadMessages());
+        
+        document.getElementById('messageInput').oninput = () => {
+            sendTypingStart();
+            setTimeout(() => sendTypingStop(), 2000);
+        };
     }
     
     function closeChat() {
         currentChat = null;
         document.getElementById('chatContainer').classList.remove('active');
+        document.getElementById('typingIndicator').style.display = 'none';
     }
     
     // ========== КАРТА ==========
@@ -837,10 +991,17 @@
             navigator.geolocation.getCurrentPosition(pos => {
                 const { latitude, longitude } = pos.coords;
                 userMarker = L.marker([latitude, longitude], {
-                    icon: L.divIcon({ html: '<div style="background:#667eea; width:16px; height:16px; border-radius:50%; border:2px solid white;"></div>', iconSize: [16,16] })
+                    icon: L.divIcon({ html: '<div style="background:#667eea; width:16px; height:16px; border-radius:50%; border:2px solid white; animation: pulse 1.5s infinite;"></div>', iconSize: [16,16] })
                 }).addTo(map);
                 map.setView([latitude, longitude], 15);
             });
+        }
+    }
+    
+    function centerMapOnAd(lat, lng) {
+        if (map) {
+            map.setView([lat, lng], 18);
+            L.marker([lat, lng]).addTo(map).bindPopup('📍 Объявление').openPopup();
         }
     }
     
@@ -849,7 +1010,6 @@
         const ads = [];
         if (snapshot.exists()) snapshot.forEach(child => ads.push({ id: child.key, ...child.val() }));
         
-        // Фильтруем только те объявления, которые рядом (в радиусе 5 км) или мои
         const myLocation = userMarker ? userMarker.getLatLng() : null;
         let visibleAds = ads;
         if (myLocation) {
@@ -870,13 +1030,25 @@
         }
         
         const search = document.getElementById('adSearch')?.value.toLowerCase() || '';
-        const filtered = visibleAds.filter(ad => ad.title.toLowerCase().includes(search));
+        let filtered = visibleAds.filter(ad => ad.title.toLowerCase().includes(search));
+        
+        if (currentFilter === 'low') filtered = filtered.filter(ad => parseInt(ad.price) < 1000);
+        if (currentFilter === 'mid') filtered = filtered.filter(ad => parseInt(ad.price) >= 1000 && parseInt(ad.price) <= 5000);
+        if (currentFilter === 'high') filtered = filtered.filter(ad => parseInt(ad.price) > 5000);
+        
         document.getElementById('adsList').innerHTML = filtered.map(ad => `
-            <div class="ad-card">
+            <div class="ad-card" onclick="centerMapOnAd(${ad.lat}, ${ad.lng})">
                 <div><b>${escapeHtml(ad.title)}</b> - ${ad.price}₽<br><small>📍 ${ad.lat.toFixed(4)}, ${ad.lng.toFixed(4)}</small></div>
-                ${ad.userId === currentUser.id ? `<button onclick="extendAd('${ad.id}')">🔄 Продлить</button>` : ''}
+                ${ad.userId === currentUser.id ? `<button onclick="event.stopPropagation(); extendAd('${ad.id}')" style="margin-top:8px; background:rgba(102,126,234,0.5); border:none; padding:4px 12px; border-radius:20px; color:white;">🔄 Продлить</button>` : ''}
             </div>
         `).join('');
+    }
+    
+    function filterAdsByCategory(category) {
+        currentFilter = category;
+        document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+        document.querySelector(`.filter-btn[data-filter="${category}"]`).classList.add('active');
+        loadAds();
     }
     
     function getDistance(lat1, lng1, lat2, lng2) {
@@ -942,7 +1114,7 @@
         const filtered = contacts.filter(c => c.name.toLowerCase().includes(search));
         document.getElementById('contactsList').innerHTML = filtered.map(c => `
             <div class="contact-item" onclick='openChat(${JSON.stringify(c).replace(/"/g, '&quot;')})'>
-                <div class="contact-avatar">${c.avatar}</div>
+                <div class="contact-avatar">${c.avatar}<span class="online-indicator"></span></div>
                 <div><b>${escapeHtml(c.name)}</b><br><small style="opacity:0.7">@${c.login}</small></div>
             </div>
         `).join('');
@@ -953,7 +1125,7 @@
         const filtered = chats.filter(c => c.contact.name.toLowerCase().includes(search));
         document.getElementById('chatsList').innerHTML = filtered.map(c => `
             <div class="contact-item" onclick='openChat(${JSON.stringify(c.contact).replace(/"/g, '&quot;')})'>
-                <div class="contact-avatar">${c.contact.avatar}</div>
+                <div class="contact-avatar">${c.contact.avatar}<span class="online-indicator"></span></div>
                 <div style="flex:1">
                     <b>${escapeHtml(c.contact.name)}</b><br>
                     <small style="opacity:0.7">${c.lastMsg.type === 'text' ? c.lastMsg.content.substring(0,30) : (c.lastMsg.type === 'audio' ? '🎤 Аудио' : '📎 Файл')}</small>
@@ -976,6 +1148,8 @@
         document.getElementById(`page-${page}`).classList.add('active');
         event.target.classList.add('active');
         if (page === 'map') { initMap(); setTimeout(() => map?.invalidateSize(), 100); loadAds(); }
+        if (page === 'chats') loadChats();
+        if (page === 'contacts') renderContacts();
     }
     
     function showProfile() { showToast(`👤 ${currentUser.login}\n🆔 ${currentUser.id}`); }
@@ -994,6 +1168,16 @@
     document.getElementById('contactSearch')?.addEventListener('input', () => renderContacts());
     document.getElementById('adSearch')?.addEventListener('input', () => loadAds());
     
+    // Свайп для меню
+    let touchStartX = 0;
+    document.body.addEventListener('touchstart', (e) => { touchStartX = e.touches[0].clientX; });
+    document.body.addEventListener('touchend', (e) => {
+        const touchEndX = e.changedTouches[0].clientX;
+        if (touchStartX - touchEndX > 100) closeMenu();
+        if (touchEndX - touchStartX > 100) toggleMenu();
+    });
+    
+    initStars();
     checkAuth();
 </script>
 </body>
