@@ -46,7 +46,7 @@
             z-index: 0;
         }
         
-        /* Стеклянная панель (glassmorphism) */
+        /* Стеклянная панель */
         .glass {
             background: rgba(255, 255, 255, 0.08);
             backdrop-filter: blur(12px);
@@ -65,7 +65,7 @@
             align-items: center;
             border-bottom: 1px solid rgba(255, 255, 255, 0.2);
             position: relative;
-            z-index: 1;
+            z-index: 10;
         }
         
         .menu-btn, .avatar {
@@ -96,7 +96,7 @@
             background: rgba(0, 0, 0, 0.3);
             backdrop-filter: blur(8px);
             position: relative;
-            z-index: 1;
+            z-index: 10;
         }
         
         .tab {
@@ -120,7 +120,7 @@
             flex: 1;
             overflow-y: auto;
             position: relative;
-            z-index: 1;
+            z-index: 10;
             padding: 12px;
         }
         
@@ -293,6 +293,16 @@
             border: 1px solid rgba(255, 255, 255, 0.2);
         }
         
+        /* Скрываем рекламу карты */
+        .leaflet-control-attribution {
+            display: none !important;
+        }
+        
+        /* Задвигаем низ карты */
+        .leaflet-bottom {
+            bottom: -50px !important;
+        }
+        
         .modal {
             position: fixed;
             top: 0;
@@ -320,7 +330,7 @@
             box-shadow: 0 25px 50px rgba(0,0,0,0.5);
         }
         
-        .modal input {
+        .modal input, .modal select {
             width: 100%;
             padding: 14px;
             margin: 12px 0;
@@ -332,7 +342,7 @@
             outline: none;
         }
         
-        .modal input:focus {
+        .modal input:focus, .modal select:focus {
             border-color: #667eea;
             box-shadow: 0 0 10px rgba(102,126,234,0.3);
         }
@@ -371,6 +381,67 @@
             margin: 8px 0;
             border-radius: 16px;
             border: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .ad-card button {
+            background: rgba(102,126,234,0.3);
+            border: none;
+            padding: 6px 12px;
+            border-radius: 20px;
+            color: white;
+            cursor: pointer;
+        }
+        
+        /* Сендвич-панель (меню) */
+        .side-menu {
+            position: fixed;
+            top: 0;
+            left: -280px;
+            width: 280px;
+            height: 100vh;
+            background: rgba(26, 26, 46, 0.95);
+            backdrop-filter: blur(20px);
+            z-index: 500;
+            transition: left 0.3s ease;
+            border-right: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 80px 20px 20px;
+        }
+        
+        .side-menu.active {
+            left: 0;
+        }
+        
+        .menu-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.6);
+            z-index: 499;
+            display: none;
+        }
+        
+        .menu-overlay.active {
+            display: block;
+        }
+        
+        .menu-item {
+            padding: 16px;
+            margin: 8px 0;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-align: center;
+        }
+        
+        .menu-item:hover {
+            background: rgba(102,126,234,0.3);
+            transform: translateX(8px);
         }
         
         ::-webkit-scrollbar {
@@ -437,6 +508,15 @@
     </div>
 </div>
 
+<!-- Сендвич-панель -->
+<div class="menu-overlay" id="menuOverlay" onclick="closeMenu()"></div>
+<div class="side-menu" id="sideMenu">
+    <div class="menu-item" onclick="showProfile(); closeMenu()">👤 Мой профиль</div>
+    <div class="menu-item" onclick="showMyAds(); closeMenu()">📋 Мои объявления</div>
+    <div class="menu-item" onclick="switchPage('map'); closeMenu();">🗺️ Карта</div>
+    <div class="menu-item" onclick="logout(); closeMenu()">🚪 Выйти</div>
+</div>
+
 <div id="authModal" class="modal active">
     <div class="modal-content">
         <h2 style="text-align:center">✨ AudioDisk</h2>
@@ -466,6 +546,14 @@
     </div>
 </div>
 
+<div id="myAdsModal" class="modal">
+    <div class="modal-content">
+        <h3>📋 Мои объявления</h3>
+        <div id="myAdsList" style="max-height: 60vh; overflow-y: auto;"></div>
+        <button class="btn-icon" onclick="closeModal('myAdsModal')" style="width:100%; margin-top:12px;">Закрыть</button>
+    </div>
+</div>
+
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
 
@@ -489,6 +577,8 @@
     let map = null;
     let markers = [];
     let mediaRecorder = null;
+    let userMarker = null;
+    let watchId = null;
     
     // ========== УВЕДОМЛЕНИЕ ==========
     function showToast(msg, isError = false) {
@@ -498,6 +588,16 @@
         toast.textContent = msg;
         document.body.appendChild(toast);
         setTimeout(() => toast.remove(), 2000);
+    }
+    
+    // ========== МЕНЮ ==========
+    function toggleMenu() {
+        document.getElementById('sideMenu').classList.toggle('active');
+        document.getElementById('menuOverlay').classList.toggle('active');
+    }
+    function closeMenu() {
+        document.getElementById('sideMenu').classList.remove('active');
+        document.getElementById('menuOverlay').classList.remove('active');
     }
     
     // ========== АВТОРИЗАЦИЯ ==========
@@ -517,6 +617,7 @@
         currentUser = { id: userId, login: login, name: login, avatar: '😎' };
         localStorage.setItem('user', JSON.stringify(currentUser));
         closeModal('authModal');
+        startGeoWatch();
         loadData();
         showToast('✅ Регистрация успешна!');
     }
@@ -537,6 +638,7 @@
         currentUser = { id: userId, login: login, name: userData.name, avatar: userData.avatar || '😎' };
         localStorage.setItem('user', JSON.stringify(currentUser));
         closeModal('authModal');
+        startGeoWatch();
         loadData();
         showToast('✅ Добро пожаловать!');
     }
@@ -545,10 +647,36 @@
         const saved = localStorage.getItem('user');
         if (saved) {
             currentUser = JSON.parse(saved);
+            startGeoWatch();
             loadData();
         } else {
             openModal('authModal');
         }
+    }
+    
+    function logout() {
+        if (watchId) navigator.geolocation.clearWatch(watchId);
+        currentUser = null;
+        localStorage.clear();
+        location.reload();
+    }
+    
+    // ========== ГЕОЛОКАЦИЯ В РЕАЛЬНОМ ВРЕМЕНИ ==========
+    function startGeoWatch() {
+        if (!navigator.geolocation) return;
+        watchId = navigator.geolocation.watchPosition(async (pos) => {
+            const { latitude, longitude } = pos.coords;
+            if (userMarker && map) {
+                userMarker.setLatLng([latitude, longitude]);
+                map.setView([latitude, longitude], 15);
+            }
+            // Обновляем позицию пользователя в Firebase
+            if (currentUser) {
+                await db.ref(`users/${currentUser.id}/location`).set({ lat: latitude, lng: longitude, updated: Date.now() });
+                // Обновляем видимость объявлений (показываем только те, что рядом)
+                await loadAds();
+            }
+        }, () => showToast('⚠️ Включите геолокацию', true), { enableHighAccuracy: true });
     }
     
     // ========== АУДИО ==========
@@ -706,15 +834,13 @@
         }).addTo(map);
         
         if (navigator.geolocation) {
-            navigator.geolocation.watchPosition(pos => {
+            navigator.geolocation.getCurrentPosition(pos => {
                 const { latitude, longitude } = pos.coords;
-                if (window.userMarker) map.removeLayer(window.userMarker);
-                window.userMarker = L.marker([latitude, longitude], {
+                userMarker = L.marker([latitude, longitude], {
                     icon: L.divIcon({ html: '<div style="background:#667eea; width:16px; height:16px; border-radius:50%; border:2px solid white;"></div>', iconSize: [16,16] })
                 }).addTo(map);
                 map.setView([latitude, longitude], 15);
-                loadAds();
-            }, () => showToast('⚠️ Включите геолокацию', true));
+            });
         }
     }
     
@@ -723,10 +849,20 @@
         const ads = [];
         if (snapshot.exists()) snapshot.forEach(child => ads.push({ id: child.key, ...child.val() }));
         
+        // Фильтруем только те объявления, которые рядом (в радиусе 5 км) или мои
+        const myLocation = userMarker ? userMarker.getLatLng() : null;
+        let visibleAds = ads;
+        if (myLocation) {
+            visibleAds = ads.filter(ad => {
+                const dist = getDistance(myLocation.lat, myLocation.lng, ad.lat, ad.lng);
+                return dist < 5000 || ad.userId === currentUser.id;
+            });
+        }
+        
         if (map) {
             markers.forEach(m => map.removeLayer(m));
             markers = [];
-            ads.forEach(ad => {
+            visibleAds.forEach(ad => {
                 const marker = L.marker([ad.lat, ad.lng]).addTo(map);
                 marker.bindPopup(`<b>${ad.title}</b><br>💰 ${ad.price}₽<br><small>${ad.userLogin}</small>`);
                 markers.push(marker);
@@ -734,22 +870,31 @@
         }
         
         const search = document.getElementById('adSearch')?.value.toLowerCase() || '';
-        const filtered = ads.filter(ad => ad.title.toLowerCase().includes(search));
+        const filtered = visibleAds.filter(ad => ad.title.toLowerCase().includes(search));
         document.getElementById('adsList').innerHTML = filtered.map(ad => `
             <div class="ad-card">
-                <b>${escapeHtml(ad.title)}</b> - ${ad.price}₽<br>
-                <small>📍 ${ad.lat.toFixed(4)}, ${ad.lng.toFixed(4)}</small><br>
-                <small>👤 ${escapeHtml(ad.userLogin)}</small>
+                <div><b>${escapeHtml(ad.title)}</b> - ${ad.price}₽<br><small>📍 ${ad.lat.toFixed(4)}, ${ad.lng.toFixed(4)}</small></div>
+                ${ad.userId === currentUser.id ? `<button onclick="extendAd('${ad.id}')">🔄 Продлить</button>` : ''}
             </div>
         `).join('');
+    }
+    
+    function getDistance(lat1, lng1, lat2, lng2) {
+        const R = 6371000;
+        const φ1 = lat1 * Math.PI/180;
+        const φ2 = lat2 * Math.PI/180;
+        const Δφ = (lat2-lat1) * Math.PI/180;
+        const Δλ = (lng2-lng1) * Math.PI/180;
+        const a = Math.sin(Δφ/2)**2 + Math.cos(φ1)*Math.cos(φ2)*Math.sin(Δλ/2)**2;
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     }
     
     async function createAd() {
         const title = document.getElementById('adTitle').value.trim();
         const price = document.getElementById('adPrice').value.trim();
         if (!title || !price) return showToast('❌ Заполните поля', true);
-        if (!window.userMarker) return showToast('❌ Включите геолокацию', true);
-        const pos = window.userMarker.getLatLng();
+        if (!userMarker) return showToast('❌ Включите геолокацию', true);
+        const pos = userMarker.getLatLng();
         await db.ref(`ads/${Date.now()}`).set({
             title, price, lat: pos.lat, lng: pos.lng,
             userId: currentUser.id, userLogin: currentUser.login,
@@ -758,6 +903,37 @@
         showToast('✅ Объявление опубликовано');
         closeModal('addAdModal');
         loadAds();
+    }
+    
+    async function extendAd(adId) {
+        await db.ref(`ads/${adId}/timestamp`).set(Date.now());
+        showToast('✅ Объявление продлено на 24 часа');
+        loadAds();
+    }
+    
+    async function showMyAds() {
+        const snapshot = await db.ref('ads').once('value');
+        const myAds = [];
+        if (snapshot.exists()) {
+            snapshot.forEach(child => {
+                const ad = child.val();
+                if (ad.userId === currentUser.id) myAds.push({ id: child.key, ...ad });
+            });
+        }
+        const container = document.getElementById('myAdsList');
+        const now = Date.now();
+        container.innerHTML = myAds.map(ad => {
+            const timeLeft = 24 - Math.floor((now - ad.timestamp) / (1000 * 60 * 60));
+            return `
+                <div class="ad-card" style="flex-direction:column; align-items:flex-start;">
+                    <b>${escapeHtml(ad.title)}</b> - ${ad.price}₽<br>
+                    <small>⏱️ Действует еще: ${timeLeft} ч</small><br>
+                    <button onclick="extendAd('${ad.id}'); closeModal('myAdsModal');" style="margin-top:8px;">🔄 Продлить</button>
+                </div>
+            `;
+        }).join('');
+        if (myAds.length === 0) container.innerHTML = '<div style="text-align:center; padding:20px;">📭 У вас нет объявлений</div>';
+        openModal('myAdsModal');
     }
     
     // ========== UI ==========
@@ -803,7 +979,6 @@
     }
     
     function showProfile() { showToast(`👤 ${currentUser.login}\n🆔 ${currentUser.id}`); }
-    function toggleMenu() { showToast('✨ Меню: профиль, выход'); }
     function openAddContactModal() { openModal('addContactModal'); }
     function showAddAdModal() { openModal('addAdModal'); }
     function openModal(id) { document.getElementById(id).classList.add('active'); }
