@@ -8,73 +8,46 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: system-ui, -apple-system, sans-serif; background: #0F0C29; color: white; height: 100vh; display: flex; flex-direction: column; }
-        
-        .header { background: linear-gradient(135deg, #6B2E8A, #4A1D6E); padding: 16px; display: flex; justify-content: space-between; align-items: center; }
+        body { font-family: system-ui; background: #0F0C29; color: white; height: 100vh; display: flex; flex-direction: column; }
+        .header { background: #6B2E8A; padding: 16px; display: flex; justify-content: space-between; align-items: center; }
         .menu-btn { background: none; border: none; color: white; font-size: 28px; cursor: pointer; }
         .avatar { width: 48px; height: 48px; border-radius: 50%; background: #FF6B6B; display: flex; align-items: center; justify-content: center; font-size: 24px; cursor: pointer; }
-        
         .search { padding: 12px; background: rgba(255,255,255,0.1); }
-        .search input { width: 100%; padding: 12px; border-radius: 30px; border: none; background: rgba(255,255,255,0.2); color: white; outline: none; }
-        
+        .search input { width: 100%; padding: 12px; border-radius: 30px; border: none; background: rgba(255,255,255,0.2); color: white; }
         .container { flex: 1; overflow-y: auto; }
         .contacts-list { padding: 12px; }
-        .contact-item { display: flex; align-items: center; padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.1); cursor: pointer; transition: background 0.2s; }
-        .contact-item:hover { background: rgba(255,255,255,0.05); }
-        .contact-avatar { width: 50px; height: 50px; border-radius: 50%; background: #FF6B6B; display: flex; align-items: center; justify-content: center; margin-right: 12px; font-size: 24px; position: relative; }
-        .online-status { width: 12px; height: 12px; border-radius: 50%; position: absolute; bottom: 2px; right: 2px; border: 2px solid white; background: #888; }
+        .contact-item { display: flex; align-items: center; padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.1); cursor: pointer; }
+        .contact-avatar { width: 50px; height: 50px; border-radius: 50%; background: #FF6B6B; display: flex; align-items: center; justify-content: center; margin-right: 12px; font-size: 24px; }
         .contact-info { flex: 1; }
         .contact-name { font-weight: bold; }
-        
         .chat { display: none; flex-direction: column; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #0F0C29; z-index: 100; }
         .chat.active { display: flex; }
         .chat-header { background: #6B2E8A; padding: 16px; display: flex; align-items: center; gap: 16px; }
         .chat-back { background: none; border: none; color: white; font-size: 24px; cursor: pointer; }
-        .chat-avatar { width: 45px; height: 45px; border-radius: 50%; background: #FF6B6B; display: flex; align-items: center; justify-content: center; font-size: 20px; }
-        .chat-info { flex: 1; }
-        .chat-name { font-weight: bold; }
-        
         .messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 8px; }
-        .message { max-width: 75%; padding: 10px 14px; border-radius: 18px; font-size: 14px; word-wrap: break-word; }
+        .message { max-width: 75%; padding: 10px 14px; border-radius: 18px; font-size: 14px; }
         .message.in { background: #2a2a4a; align-self: flex-start; }
         .message.out { background: #6B2E8A; align-self: flex-end; }
         .message-time { font-size: 10px; color: #aaa; margin-top: 4px; text-align: right; }
-        
-        .bottom-panel { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: rgba(0,0,0,0.8); }
-        .message-input { flex: 1; padding: 10px 14px; border-radius: 30px; border: none; background: rgba(255,255,255,0.1); color: white; resize: none; font-family: inherit; }
+        .bottom-panel { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: rgba(0,0,0,0.8); position: fixed; bottom: 0; left: 0; right: 0; }
+        .message-input { flex: 1; padding: 10px 14px; border-radius: 30px; border: none; background: rgba(255,255,255,0.1); color: white; }
         .record-btn { width: 44px; height: 44px; border-radius: 50%; background: #6B2E8A; border: none; color: white; font-size: 20px; cursor: pointer; }
-        
         .map-container { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 200; background: #1a2a3a; }
         .map-container.active { display: block; }
         #map { height: 100%; width: 100%; }
         .map-controls { position: absolute; bottom: 20px; left: 10px; right: 10px; background: rgba(0,0,0,0.8); border-radius: 30px; padding: 10px; display: flex; gap: 8px; z-index: 201; }
-        .map-controls input { flex: 1; padding: 10px; border-radius: 30px; border: none; background: rgba(255,255,255,0.2); color: white; }
+        .map-controls input { flex: 1; padding: 10px; border-radius: 30px; border: none; }
         .map-controls button { background: #4CAF50; border: none; padding: 10px 20px; border-radius: 30px; color: white; cursor: pointer; }
         .close-map { position: absolute; top: 50px; right: 10px; background: #f44336; width: 44px; height: 44px; border-radius: 50%; border: none; color: white; font-size: 24px; cursor: pointer; z-index: 201; }
-        
-        .menu-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 300; display: none; }
-        .menu-overlay.active { display: block; }
-        .menu { position: fixed; top: 0; left: -280px; width: 280px; height: 100vh; background: #1A1738; z-index: 301; transition: left 0.3s; overflow-y: auto; }
-        .menu.active { left: 0; }
-        .menu-header { padding: 50px 20px 20px; text-align: center; }
-        .menu-avatar { width: 80px; height: 80px; border-radius: 50%; background: #FF6B6B; margin: 0 auto 15px; display: flex; align-items: center; justify-content: center; font-size: 40px; }
-        .menu-item { padding: 15px 20px; display: flex; align-items: center; gap: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); cursor: pointer; }
-        .menu-item-icon { font-size: 24px; width: 32px; }
-        
         .modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 400; display: none; align-items: center; justify-content: center; }
         .modal.active { display: flex; }
         .modal-content { background: #1A1738; border-radius: 24px; padding: 24px; width: 90%; max-width: 400px; }
         .modal h2 { color: #FF6B6B; margin-bottom: 20px; }
-        .modal-input { width: 100%; padding: 12px; margin-bottom: 16px; border-radius: 12px; border: none; background: rgba(255,255,255,0.1); color: white; outline: none; }
+        .modal-input { width: 100%; padding: 12px; margin-bottom: 16px; border-radius: 12px; border: none; background: rgba(255,255,255,0.1); color: white; }
         .modal-buttons { display: flex; gap: 12px; }
         .modal-btn { flex: 1; padding: 12px; border-radius: 30px; border: none; cursor: pointer; }
         .modal-btn-primary { background: #6B2E8A; color: white; }
         .modal-btn-secondary { background: rgba(255,255,255,0.1); color: white; }
-        
-        @media (max-width: 480px) {
-            .message { max-width: 85%; }
-            .record-btn { width: 38px; height: 38px; font-size: 16px; }
-        }
     </style>
 </head>
 <body>
@@ -91,29 +64,13 @@
 
 <div class="container">
     <div class="contacts-list" id="contactsList"></div>
-    <button class="record-btn" onclick="openAddContactModal()" style="width: 90%; margin: 16px auto; border-radius: 30px; display: block;">➕ Добавить контакт</button>
-</div>
-
-<div class="menu-overlay" id="menuOverlay" onclick="closeMenu()"></div>
-<div class="menu" id="menu">
-    <div class="menu-header">
-        <div class="menu-avatar" id="menuAvatar">😎</div>
-        <div class="menu-user-name" id="menuName">Не авторизован</div>
-        <div class="menu-user-login" id="menuLogin"></div>
-    </div>
-    <div class="menu-item" onclick="openProfileModal(); closeMenu()"><span class="menu-item-icon">👤</span><div>Мой профиль</div></div>
-    <div class="menu-item" onclick="openMap(); closeMenu()"><span class="menu-item-icon">🗺️</span><div>Карта объявлений</div></div>
-    <div class="menu-item" onclick="openContactsModal(); closeMenu()"><span class="menu-item-icon">📱</span><div>Контакты</div></div>
-    <div class="menu-item" onclick="logout()"><span class="menu-item-icon">🚪</span><div>Выйти</div></div>
+    <button class="record-btn" onclick="openAddContactModal()" style="width: 90%; margin: 16px auto; border-radius: 30px;">➕ Добавить контакт</button>
 </div>
 
 <div class="chat" id="chat">
     <div class="chat-header">
         <button class="chat-back" onclick="closeChat()">←</button>
-        <div class="chat-avatar" id="chatAvatar">👤</div>
-        <div class="chat-info">
-            <div class="chat-name" id="chatName">...</div>
-        </div>
+        <div class="chat-info"><div class="chat-name" id="chatName">...</div></div>
     </div>
     <div class="messages" id="messages"></div>
     <div class="bottom-panel">
@@ -144,30 +101,11 @@
     </div>
 </div>
 
-<div class="modal" id="profileModal">
-    <div class="modal-content">
-        <h2>Мой профиль</h2>
-        <input type="text" class="modal-input" id="profileName" placeholder="Имя">
-        <div class="modal-buttons">
-            <button class="modal-btn modal-btn-secondary" onclick="closeModal('profileModal')">Отмена</button>
-            <button class="modal-btn modal-btn-primary" onclick="saveProfile()">Сохранить</button>
-        </div>
-    </div>
-</div>
-
-<div class="modal" id="contactsModal">
-    <div class="modal-content">
-        <h2>Контакты</h2>
-        <div id="contactsListModal"></div>
-        <button class="modal-btn modal-btn-primary" onclick="closeModal('contactsModal')">Закрыть</button>
-    </div>
-</div>
-
 <div class="modal" id="addContactModal">
     <div class="modal-content">
         <h2>➕ Добавить контакт</h2>
-        <input type="text" class="modal-input" id="newContactUUID" placeholder="UUID пользователя">
-        <input type="text" class="modal-input" id="newContactName" placeholder="Имя для отображения">
+        <input type="text" class="modal-input" id="newContactId" placeholder="ID пользователя">
+        <input type="text" class="modal-input" id="newContactName" placeholder="Имя">
         <div class="modal-buttons">
             <button class="modal-btn modal-btn-secondary" onclick="closeModal('addContactModal')">Отмена</button>
             <button class="modal-btn modal-btn-primary" onclick="addContact()">Добавить</button>
@@ -175,7 +113,26 @@
     </div>
 </div>
 
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+
 <script>
+    // ========== FIREBASE КОНФИГУРАЦИЯ (ВСТАВЬ СВОИ ДАННЫЕ) ==========
+    const firebaseConfig = {
+        apiKey: "AIzaSyCCIY9lL15FpypsI310HCuTxQSwkpCpuiE",
+        authDomain: "audiozvonok-b340d.firebaseapp.com",
+        databaseURL: "https://audiozvonok-b340d-default-rtdb.firebaseio.com",
+        projectId: "audiozvonok-b340d",
+        storageBucket: "audiozvonok-b340d.firebasestorage.app",
+        messagingSenderId: "172196854367",
+        appId: "1:172196854367:web:8ae1b63377a14305e139ea"
+    };
+    // ================================================================
+
+    // Инициализация Firebase
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
     // ========== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ==========
     let currentUser = null;
     let contacts = [];
@@ -183,79 +140,36 @@
     let map = null;
     let currentLocation = null;
     let adMarkers = [];
-    
-    // URL маршрутизатора (ВАШ ПК)
-    const ROUTER_URL = "ws://localhost:8000/ws/router";
-    let routerWs = null;
-    let requestId = 0;
-    let pendingRequests = new Map();
-    
-    // ========== WEBSOCKET К МАРШРУТИЗАТОРУ ==========
-    function connectRouter() {
-        routerWs = new WebSocket(ROUTER_URL);
-        
-        routerWs.onopen = () => {
-            console.log("✅ Подключен к маршрутизатору");
-            if (currentUser) {
-                loadContacts();
-            }
-        };
-        
-        routerWs.onmessage = (event) => {
-            const response = JSON.parse(event.data);
-            const pending = pendingRequests.get(response.id);
-            if (pending) {
-                pending.resolve(response.result);
-                pendingRequests.delete(response.id);
-            }
-        };
-        
-        routerWs.onerror = (error) => {
-            console.error("❌ Ошибка WebSocket:", error);
-        };
-        
-        routerWs.onclose = () => {
-            console.log("⚠️ Соединение с маршрутизатором закрыто");
-            setTimeout(connectRouter, 3000);
-        };
-    }
-    
-    function sendRequest(action, params) {
-        return new Promise((resolve, reject) => {
-            if (!routerWs || routerWs.readyState !== WebSocket.OPEN) {
-                reject(new Error("Маршрутизатор не подключен"));
-                return;
-            }
-            
-            const id = ++requestId;
-            pendingRequests.set(id, { resolve, reject });
-            routerWs.send(JSON.stringify({ id, action, ...params }));
-            
-            setTimeout(() => {
-                if (pendingRequests.has(id)) {
-                    pendingRequests.delete(id);
-                    reject(new Error("Timeout"));
-                }
-            }, 30000);
-        });
-    }
-    
+
     // ========== АВТОРИЗАЦИЯ ==========
     async function register() {
         const login = document.getElementById('loginInput').value.trim();
         const password = document.getElementById('passwordInput').value.trim();
         if (!login || !password) { alert('Введите логин и пароль'); return; }
         
-        try {
-            const result = await sendRequest("register", { login, password, name: login });
-            if (result.success) {
-                alert('Регистрация успешна!');
-                document.getElementById('loginInput').value = login;
-                await login();
-            } else {
-                alert(result.error);
-            }
-        } catch(e) { alert("Ошибка: " + e.message); }
+        const usersRef = db.ref('users');
+        const snapshot = await usersRef.orderByChild('login').equalTo(login).get();
+        
+        if (snapshot.exists()) {
+            alert('Логин уже существует');
+            return;
+        }
+        
+        const userId = Date.now().toString();
+        await usersRef.child(userId).set({
+            login: login,
+            password: btoa(password),
+            name: login,
+            avatar: '😎',
+            created_at: new Date().toISOString()
+        });
+        
+        currentUser = { id: userId, login: login, name: login, avatar: '😎' };
+        localStorage.setItem('user', JSON.stringify(currentUser));
+        closeModal('authModal');
+        updateUI();
+        loadContacts();
+        alert('Регистрация успешна!');
     }
     
     async function login() {
@@ -263,18 +177,31 @@
         const password = document.getElementById('passwordInput').value.trim();
         if (!login || !password) { alert('Введите логин и пароль'); return; }
         
-        try {
-            const result = await sendRequest("login", { login, password });
-            if (result.success) {
-                currentUser = { uuid: result.uuid, name: result.name, avatar: result.avatar };
-                localStorage.setItem('user', JSON.stringify(currentUser));
-                closeModal('authModal');
-                updateUI();
-                await loadContacts();
-            } else {
-                alert(result.error);
-            }
-        } catch(e) { alert("Ошибка: " + e.message); }
+        const usersRef = db.ref('users');
+        const snapshot = await usersRef.orderByChild('login').equalTo(login).get();
+        
+        if (!snapshot.exists()) {
+            alert('Пользователь не найден');
+            return;
+        }
+        
+        let userId = null;
+        let userData = null;
+        snapshot.forEach((child) => {
+            userId = child.key;
+            userData = child.val();
+        });
+        
+        if (btoa(password) !== userData.password) {
+            alert('Неверный пароль');
+            return;
+        }
+        
+        currentUser = { id: userId, login: login, name: userData.name, avatar: userData.avatar || '😎' };
+        localStorage.setItem('user', JSON.stringify(currentUser));
+        closeModal('authModal');
+        updateUI();
+        loadContacts();
     }
     
     function checkAuth() {
@@ -294,42 +221,50 @@
         contacts = [];
         renderContacts();
         openModal('authModal');
-        closeMenu();
         closeChat();
     }
     
     // ========== КОНТАКТЫ ==========
     async function loadContacts() {
         if (!currentUser) return;
-        try {
-            const result = await sendRequest("get_contacts", { user_uuid: currentUser.uuid });
-            if (result.success) {
-                contacts = result.contacts || [];
-                renderContacts();
+        const contactsRef = db.ref('contacts/' + currentUser.id);
+        const snapshot = await contactsRef.get();
+        
+        contacts = [];
+        if (snapshot.exists()) {
+            for (const [contactId, contactData] of Object.entries(snapshot.val())) {
+                const userSnapshot = await db.ref('users/' + contactId).get();
+                const userData = userSnapshot.val();
+                contacts.push({
+                    id: contactId,
+                    name: contactData.name || userData?.name || contactId,
+                    avatar: userData?.avatar || '👤'
+                });
             }
-        } catch(e) { console.error(e); }
+        }
+        renderContacts();
     }
     
     async function addContact() {
-        const contactUUID = document.getElementById('newContactUUID').value.trim();
-        const contactName = document.getElementById('newContactName').value.trim() || contactUUID;
-        if (!contactUUID) return;
+        const contactId = document.getElementById('newContactId').value.trim();
+        const contactName = document.getElementById('newContactName').value.trim() || contactId;
+        if (!contactId) return;
         
-        try {
-            const result = await sendRequest("add_contact", { 
-                user_uuid: currentUser.uuid, 
-                contact_uuid: contactUUID, 
-                contact_name: contactName 
-            });
-            if (result.success) {
-                await loadContacts();
-                closeModal('addContactModal');
-                document.getElementById('newContactUUID').value = '';
-                document.getElementById('newContactName').value = '';
-            } else {
-                alert(result.error);
-            }
-        } catch(e) { alert("Ошибка: " + e.message); }
+        const userSnapshot = await db.ref('users/' + contactId).get();
+        if (!userSnapshot.exists()) {
+            alert('Пользователь не найден');
+            return;
+        }
+        
+        await db.ref('contacts/' + currentUser.id + '/' + contactId).set({
+            name: contactName,
+            added_at: new Date().toISOString()
+        });
+        
+        await loadContacts();
+        closeModal('addContactModal');
+        document.getElementById('newContactId').value = '';
+        document.getElementById('newContactName').value = '';
     }
     
     function renderContacts() {
@@ -343,8 +278,8 @@
             return;
         }
         container.innerHTML = filtered.map(c => `
-            <div class="contact-item" onclick="openChat('${c.uuid}')">
-                <div class="contact-avatar">${c.avatar || '👤'}<span class="online-status"></span></div>
+            <div class="contact-item" onclick="openChat('${c.id}')">
+                <div class="contact-avatar">${c.avatar}</div>
                 <div class="contact-info">
                     <div class="contact-name">${escapeHtml(c.name)}</div>
                 </div>
@@ -352,47 +287,47 @@
         `).join('');
     }
     
-    function renderContactsModal() {
-        const container = document.getElementById('contactsListModal');
-        if (!contacts.length) {
-            container.innerHTML = '<div style="text-align:center; padding:20px;">Нет контактов</div>';
-            return;
-        }
-        container.innerHTML = contacts.map(c => `
-            <div style="display: flex; justify-content: space-between; padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.1);">
-                <div><strong>${escapeHtml(c.name)}</strong><div style="font-size: 12px;">${c.uuid}</div></div>
-            </div>
-        `).join('');
-    }
-    
     function filterContacts() { renderContacts(); }
     
     // ========== ЧАТ ==========
-    async function openChat(contactUuid) {
-        const contact = contacts.find(c => c.uuid === contactUuid);
+    async function openChat(contactId) {
+        const contact = contacts.find(c => c.id === contactId);
         if (!contact) return;
         currentChatContact = contact;
         document.getElementById('chatName').textContent = contact.name;
-        document.getElementById('chatAvatar').textContent = contact.avatar || '👤';
         document.getElementById('chat').classList.add('active');
         await loadMessages();
+        
+        // Подписка на новые сообщения
+        const messagesRef = db.ref('messages/' + currentUser.id + '/' + contactId);
+        messagesRef.off();
+        messagesRef.on('child_added', (snapshot) => {
+            const msg = snapshot.val();
+            if (msg.from === currentUser.id) return;
+            appendMessage(msg.text, msg.time, false);
+        });
     }
     
     function closeChat() {
+        if (currentChatContact) {
+            db.ref('messages/' + currentUser.id + '/' + currentChatContact.id).off();
+        }
         document.getElementById('chat').classList.remove('active');
         currentChatContact = null;
     }
     
     async function loadMessages() {
         if (!currentChatContact) return;
-        try {
-            const result = await sendRequest("get_messages", { 
-                user_uuid: currentUser.uuid, 
-                contact_uuid: currentChatContact.uuid,
-                limit: 50
+        const messagesRef = db.ref('messages/' + currentUser.id + '/' + currentChatContact.id);
+        const snapshot = await messagesRef.orderByKey().limitToLast(50).get();
+        
+        const messages = [];
+        if (snapshot.exists()) {
+            snapshot.forEach((child) => {
+                messages.push(child.val());
             });
-            if (result.success) renderMessages(result.messages || []);
-        } catch(e) { console.error(e); }
+        }
+        renderMessages(messages);
     }
     
     function renderMessages(messages) {
@@ -403,12 +338,17 @@
             return;
         }
         messages.forEach(msg => {
-            const isOutgoing = msg.is_outgoing;
-            const div = document.createElement('div');
-            div.className = `message ${isOutgoing ? 'out' : 'in'}`;
-            div.innerHTML = `<div>${escapeHtml(msg.text)}</div><div class="message-time">${msg.time || ''}</div>`;
-            container.appendChild(div);
+            appendMessage(msg.text, msg.time, msg.from === currentUser.id);
         });
+        container.scrollTop = container.scrollHeight;
+    }
+    
+    function appendMessage(text, time, isOutgoing) {
+        const container = document.getElementById('messages');
+        const div = document.createElement('div');
+        div.className = `message ${isOutgoing ? 'out' : 'in'}`;
+        div.innerHTML = `<div>${escapeHtml(text)}</div><div class="message-time">${time}</div>`;
+        container.appendChild(div);
         container.scrollTop = container.scrollHeight;
     }
     
@@ -417,16 +357,24 @@
         const text = input.value.trim();
         if (!text || !currentChatContact) return;
         
-        try {
-            await sendRequest("send_message", { 
-                from_uuid: currentUser.uuid, 
-                to_uuid: currentChatContact.uuid, 
-                text 
-            });
-            input.value = '';
-            input.style.height = 'auto';
-            await loadMessages();
-        } catch(e) { alert("Ошибка: " + e.message); }
+        const time = new Date().toLocaleTimeString();
+        const msgId = Date.now().toString();
+        
+        const msgData = {
+            from: currentUser.id,
+            text: text,
+            time: time,
+            timestamp: Date.now()
+        };
+        
+        // Сохраняем для отправителя
+        await db.ref('messages/' + currentUser.id + '/' + currentChatContact.id + '/' + msgId).set(msgData);
+        // Сохраняем для получателя
+        await db.ref('messages/' + currentChatContact.id + '/' + currentUser.id + '/' + msgId).set(msgData);
+        
+        input.value = '';
+        input.style.height = 'auto';
+        appendMessage(text, time, true);
     }
     
     // ========== КАРТА И ОБЪЯВЛЕНИЯ ==========
@@ -445,9 +393,7 @@
                 const lng = pos.coords.longitude;
                 currentLocation = { lat, lng };
                 if (window.myMarker) map.removeLayer(window.myMarker);
-                window.myMarker = L.marker([lat, lng], {
-                    icon: L.divIcon({ html: '<div style="background:#2196F3; width:20px; height:20px; border-radius:50%; border:2px solid white;"></div>', iconSize: [20,20] })
-                }).addTo(map);
+                window.myMarker = L.marker([lat, lng]).addTo(map);
                 map.setView([lat, lng], 15);
                 loadAds();
             });
@@ -456,41 +402,40 @@
     
     async function loadAds() {
         if (!currentLocation) return;
-        try {
-            const result = await sendRequest("get_ads", {});
-            if (result.success) {
-                adMarkers.forEach(m => map.removeLayer(m));
-                adMarkers = [];
-                (result.ads || []).forEach(ad => {
-                    const dist = getDistance(currentLocation.lat, currentLocation.lng, ad.lat, ad.lng);
-                    if (dist < 5000) {
-                        const marker = L.marker([ad.lat, ad.lng], {
-                            icon: L.divIcon({ html: `<div style="background:#FF6B6B; width:30px; height:30px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:14px;">💰</div>`, iconSize: [30,30] })
-                        }).addTo(map);
-                        marker.bindPopup(`<b>${ad.text}</b><br>Цена: ${ad.price} руб`);
-                        adMarkers.push(marker);
-                    }
-                });
+        const snapshot = await db.ref('ads').get();
+        adMarkers.forEach(m => map.removeLayer(m));
+        adMarkers = [];
+        
+        if (snapshot.exists()) {
+            const ads = snapshot.val();
+            for (const [id, ad] of Object.entries(ads)) {
+                const dist = getDistance(currentLocation.lat, currentLocation.lng, ad.lat, ad.lng);
+                if (dist < 5000) {
+                    const marker = L.marker([ad.lat, ad.lng]).addTo(map);
+                    marker.bindPopup(`<b>${ad.text}</b><br>Цена: ${ad.price} руб`);
+                    adMarkers.push(marker);
+                }
             }
-        } catch(e) { console.error(e); }
+        }
     }
     
     async function createAd() {
         const text = document.getElementById('adText').value;
         const price = document.getElementById('adPrice').value;
-        if (!text || !currentLocation) { alert('Введите текст'); return; }
-        try {
-            await sendRequest("create_ad", { 
-                user_uuid: currentUser.uuid, 
-                lat: currentLocation.lat, 
-                lng: currentLocation.lng, 
-                text, 
-                price 
-            });
-            document.getElementById('adText').value = '';
-            document.getElementById('adPrice').value = '';
-            await loadAds();
-        } catch(e) { alert("Ошибка: " + e.message); }
+        if (!text || !currentLocation) { alert('Введите текст и включите GPS'); return; }
+        
+        await db.ref('ads/' + Date.now()).set({
+            user_id: currentUser.id,
+            lat: currentLocation.lat,
+            lng: currentLocation.lng,
+            text: text,
+            price: price,
+            created_at: new Date().toISOString()
+        });
+        
+        document.getElementById('adText').value = '';
+        document.getElementById('adPrice').value = '';
+        await loadAds();
     }
     
     function getDistance(lat1, lng1, lat2, lng2) {
@@ -512,37 +457,17 @@
     function closeMap() { document.getElementById('mapContainer').classList.remove('active'); }
     
     // ========== UI ФУНКЦИИ ==========
-    function toggleMenu() {
-        document.getElementById('menu').classList.toggle('active');
-        document.getElementById('menuOverlay').classList.toggle('active');
-    }
-    function closeMenu() {
-        document.getElementById('menu').classList.remove('active');
-        document.getElementById('menuOverlay').classList.remove('active');
-    }
+    function toggleMenu() { document.getElementById('menu').classList.toggle('active'); }
+    function closeMenu() { document.getElementById('menu').classList.remove('active'); }
     function openModal(id) { document.getElementById(id).classList.add('active'); }
     function closeModal(id) { document.getElementById(id).classList.remove('active'); }
-    function openProfileModal() {
-        document.getElementById('profileName').value = currentUser?.name || '';
-        openModal('profileModal');
-    }
-    function openContactsModal() { renderContactsModal(); openModal('contactsModal'); }
+    function openProfileModal() { openModal('profileModal'); }
     function openAddContactModal() { openModal('addContactModal'); }
-    
-    async function saveProfile() {
-        alert("Функция сохранения профиля в разработке");
-        closeModal('profileModal');
-    }
-    
     function updateUI() {
         if (currentUser) {
             document.getElementById('headerAvatar').textContent = currentUser.avatar || '😎';
-            document.getElementById('menuAvatar').textContent = currentUser.avatar || '😎';
-            document.getElementById('menuName').textContent = currentUser.name || 'Пользователь';
-            document.getElementById('menuLogin').textContent = currentUser.uuid?.substring(0, 8) + '...';
         }
     }
-    
     function escapeHtml(text) {
         const div = document.createElement('div');
         div.textContent = text;
@@ -563,7 +488,6 @@
         this.style.height = Math.min(this.scrollHeight, window.innerHeight * 0.33) + 'px';
     });
     
-    connectRouter();
     checkAuth();
 </script>
 </body>
