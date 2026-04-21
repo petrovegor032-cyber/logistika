@@ -1,0 +1,976 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>AudioDisk - Полный функционал</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        
+        body {
+            font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #0a0a2a 0%, #1a1a3a 50%, #0a0a2a 100%);
+            color: white;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        #stars-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
+        }
+        
+        .header {
+            background: rgba(102, 126, 234, 0.3);
+            backdrop-filter: blur(12px);
+            padding: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            position: relative;
+            z-index: 10;
+        }
+        
+        .menu-btn, .avatar {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            font-size: 24px;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .page {
+            display: none;
+            flex: 1;
+            overflow-y: auto;
+            position: relative;
+            z-index: 10;
+            padding: 12px;
+        }
+        
+        .page.active { display: block; }
+        
+        .search {
+            padding: 12px;
+            margin-bottom: 12px;
+        }
+        
+        .search input {
+            width: 100%;
+            padding: 14px;
+            border-radius: 30px;
+            border: none;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            font-size: 16px;
+            outline: none;
+        }
+        
+        .contact-item {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            margin: 8px 0;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            cursor: pointer;
+            transition: all 0.3s;
+            position: relative;
+        }
+        
+        .contact-avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 12px;
+            font-size: 24px;
+            position: relative;
+        }
+        
+        .online-indicator {
+            position: absolute;
+            bottom: 2px;
+            right: 2px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #4CAF50;
+            border: 2px solid white;
+        }
+        
+        .chat-container {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, #0a0a2a, #1a1a3a);
+            z-index: 200;
+            flex-direction: column;
+        }
+        
+        .chat-container.active { display: flex; }
+        
+        .chat-header {
+            background: rgba(102, 126, 234, 0.3);
+            backdrop-filter: blur(12px);
+            padding: 16px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .message {
+            max-width: 75%;
+            padding: 10px 14px;
+            border-radius: 18px;
+        }
+        
+        .message.out {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            align-self: flex-end;
+        }
+        
+        .message.in {
+            background: rgba(255, 255, 255, 0.1);
+            align-self: flex-start;
+        }
+        
+        .message-meta {
+            font-size: 10px;
+            opacity: 0.7;
+            margin-top: 4px;
+        }
+        
+        .bottom-panel {
+            display: flex;
+            gap: 8px;
+            padding: 12px;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(12px);
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .message-input {
+            flex: 1;
+            padding: 12px;
+            border-radius: 30px;
+            border: none;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            resize: none;
+            font-family: inherit;
+            outline: none;
+        }
+        
+        .btn-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border: none;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+        }
+        
+        #map {
+            height: 60vh;
+            width: 100%;
+            border-radius: 20px;
+            margin: 12px 0;
+        }
+        
+        .leaflet-control-attribution { display: none !important; }
+        
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(8px);
+            z-index: 300;
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal.active { display: flex; }
+        
+        .modal-content {
+            background: rgba(26, 26, 46, 0.95);
+            border-radius: 28px;
+            padding: 28px;
+            width: 90%;
+            max-width: 400px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            position: relative;
+        }
+        
+        .modal-close {
+            position: absolute;
+            top: 12px;
+            right: 16px;
+            font-size: 24px;
+            cursor: pointer;
+        }
+        
+        .modal input {
+            width: 100%;
+            padding: 14px;
+            margin: 12px 0;
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            outline: none;
+        }
+        
+        .toast {
+            position: fixed;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            backdrop-filter: blur(12px);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 40px;
+            font-size: 14px;
+            z-index: 400;
+        }
+        
+        .ad-card {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 12px;
+            margin: 8px 0;
+            border-radius: 16px;
+            cursor: pointer;
+        }
+        
+        .side-menu {
+            position: fixed;
+            top: 0;
+            left: -280px;
+            width: 280px;
+            height: 100vh;
+            background: rgba(26, 26, 46, 0.95);
+            backdrop-filter: blur(20px);
+            z-index: 500;
+            transition: left 0.3s ease;
+            border-right: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 80px 20px 20px;
+        }
+        
+        .side-menu.active { left: 0; }
+        
+        .menu-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.6);
+            z-index: 499;
+            display: none;
+        }
+        
+        .menu-overlay.active { display: block; }
+        
+        .menu-item {
+            padding: 16px;
+            margin: 8px 0;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            cursor: pointer;
+            text-align: center;
+        }
+        
+        .filter-bar {
+            display: flex;
+            gap: 8px;
+            margin: 12px 0;
+            flex-wrap: wrap;
+        }
+        
+        .filter-btn {
+            background: rgba(255,255,255,0.1);
+            border: none;
+            padding: 8px 16px;
+            border-radius: 30px;
+            color: white;
+            cursor: pointer;
+        }
+        
+        .filter-btn.active {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+        }
+        
+        .my-location-btn {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1000;
+            background: rgba(0,0,0,0.6);
+            border: none;
+            border-radius: 50%;
+            width: 44px;
+            height: 44px;
+            font-size: 24px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+<canvas id="stars-canvas"></canvas>
+
+<div class="header">
+    <button class="menu-btn" onclick="toggleMenu()">☰</button>
+    <h2>✨ AudioDisk</h2>
+    <div class="avatar" onclick="showProfile()">😎</div>
+</div>
+
+<!-- Основная страница с картой -->
+<div id="page-main" class="page active">
+    <div id="map"></div>
+    <button class="my-location-btn" onclick="goToMyLocation()">📍</button>
+    <div class="filter-bar">
+        <button class="filter-btn active" data-filter="all" onclick="filterAds('all')">Все</button>
+        <button class="filter-btn" data-filter="low" onclick="filterAds('low')">До 1000₽</button>
+        <button class="filter-btn" data-filter="mid" onclick="filterAds('mid')">1000-5000₽</button>
+        <button class="filter-btn" data-filter="high" onclick="filterAds('high')">От 5000₽</button>
+    </div>
+    <div style="display: flex; gap: 8px; margin: 12px 0;">
+        <input type="text" id="adSearch" placeholder="🔍 Поиск объявлений..." style="flex:1; padding:12px; border-radius:30px; border:none; background:rgba(255,255,255,0.1); color:white;">
+        <button class="btn-icon" onclick="showAddAdModal()">➕</button>
+    </div>
+    <div id="adsList"></div>
+</div>
+
+<!-- Страница чатов -->
+<div id="page-chats" class="page">
+    <div class="search"><input type="text" id="chatSearch" placeholder="🔍 Поиск чатов..."></div>
+    <div id="chatsList"></div>
+</div>
+
+<!-- Страница контактов -->
+<div id="page-contacts" class="page">
+    <div class="search"><input type="text" id="contactSearch" placeholder="🔍 Поиск контактов..."></div>
+    <button class="btn-icon" onclick="openAddContactModal()" style="width: 90%; margin: 12px auto; display: block;">➕ Добавить контакт</button>
+    <div id="contactsList"></div>
+</div>
+
+<!-- Чат -->
+<div id="chatContainer" class="chat-container">
+    <div class="chat-header">
+        <button class="btn-icon" onclick="closeChat()" style="background:none;">←</button>
+        <div style="flex:1"><div id="chatName" style="font-weight:bold"></div><div id="chatLogin" style="font-size:11px"></div></div>
+        <button class="btn-icon" onclick="startCall()">📞</button>
+    </div>
+    <div class="messages" id="messages"></div>
+    <div class="bottom-panel">
+        <button class="btn-icon" onclick="selectFile()">📎</button>
+        <button class="btn-icon" id="recordBtn" onclick="toggleRecording()">🎤</button>
+        <textarea class="message-input" id="messageInput" placeholder="Сообщение" rows="1"></textarea>
+        <button class="btn-icon" onclick="sendMessage()">✏️</button>
+        <input type="file" id="fileInput" style="display:none">
+    </div>
+</div>
+
+<!-- Сендвич-панель -->
+<div class="side-menu" id="sideMenu">
+    <div class="menu-item" onclick="showProfile(); closeMenu()">👤 Мой профиль</div>
+    <div class="menu-item" onclick="showMyAds(); closeMenu()">📋 Мои объявления</div>
+    <div class="menu-item" onclick="switchPage('chats'); closeMenu();">💬 Чаты</div>
+    <div class="menu-item" onclick="switchPage('contacts'); closeMenu();">📞 Контакты</div>
+    <div class="menu-item" onclick="switchPage('main'); closeMenu();">🗺️ Карта</div>
+    <div class="menu-item" onclick="logout(); closeMenu()">🚪 Выйти</div>
+</div>
+<div class="menu-overlay" id="menuOverlay" onclick="closeMenu()"></div>
+
+<!-- Модалки -->
+<div id="authModal" class="modal">
+    <div class="modal-content">
+        <span class="modal-close" onclick="closeModal('authModal')">✕</span>
+        <h2 style="text-align:center">✨ AudioDisk</h2>
+        <input type="text" id="loginInput" placeholder="Логин">
+        <input type="password" id="passwordInput" placeholder="Пароль">
+        <div style="display: flex; gap: 12px;">
+            <button class="btn-icon" onclick="register()" style="flex:1; border-radius:30px;">Регистрация</button>
+            <button class="btn-icon" onclick="login()" style="flex:1; border-radius:30px;">Вход</button>
+        </div>
+    </div>
+</div>
+
+<div id="addContactModal" class="modal">
+    <div class="modal-content">
+        <span class="modal-close" onclick="closeModal('addContactModal')">✕</span>
+        <h3>➕ Добавить контакт</h3>
+        <input type="text" id="contactLoginInput" placeholder="Логин друга">
+        <button class="btn-icon" onclick="addContact()" style="width:100%; border-radius:30px;">Найти</button>
+    </div>
+</div>
+
+<div id="addAdModal" class="modal">
+    <div class="modal-content">
+        <span class="modal-close" onclick="closeModal('addAdModal')">✕</span>
+        <h3>📢 Новое объявление</h3>
+        <input type="text" id="adTitle" placeholder="Что продаёте?">
+        <input type="text" id="adPrice" placeholder="Цена">
+        <button class="btn-icon" onclick="createAd()" style="width:100%; border-radius:30px;">Опубликовать</button>
+    </div>
+</div>
+
+<div id="myAdsModal" class="modal">
+    <div class="modal-content">
+        <span class="modal-close" onclick="closeModal('myAdsModal')">✕</span>
+        <h3>📋 Мои объявления</h3>
+        <button class="btn-icon" onclick="showAddAdModal(); closeModal('myAdsModal')" style="width:100%; margin-bottom:12px;">➕ Создать объявление</button>
+        <div id="myAdsList" style="max-height: 50vh; overflow-y: auto;"></div>
+    </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+
+<script>
+    // ========== ЛОГГЕР ==========
+    function log(action, data = null) {
+        console.log(`[${new Date().toLocaleTimeString()}] ${action}`, data || '');
+    }
+    
+    // ========== FIREBASE ==========
+    const firebaseConfig = {
+        apiKey: "AIzaSyCCIY9lL15FpypsI310HCuTxQSwkpCpuiE",
+        authDomain: "audiozvonok-b340d.firebaseapp.com",
+        databaseURL: "https://audiozvonok-b340d-default-rtdb.firebaseio.com",
+        projectId: "audiozvonok-b340d"
+    };
+    
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+    log('Firebase инициализирован');
+    
+    // ========== ПЕРЕМЕННЫЕ ==========
+    let currentUser = null;
+    let contacts = [];
+    let chats = [];
+    let currentChat = null;
+    let map = null;
+    let markers = [];
+    let allAds = [];
+    let currentFilter = 'all';
+    let userMarker = null;
+    
+    // ========== ЗВЕЗДЫ ==========
+    function initStars() {
+        const canvas = document.getElementById('stars-canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        const stars = [];
+        for (let i = 0; i < 100; i++) {
+            stars.push({
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
+                radius: Math.random() * 2,
+                alpha: Math.random(),
+                speed: 0.5 + Math.random() * 2
+            });
+        }
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for (const star of stars) {
+                ctx.beginPath();
+                ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(255, 255, 255, ${star.alpha})`;
+                ctx.fill();
+                star.y += star.speed;
+                if (star.y > canvas.height) star.y = 0;
+            }
+            requestAnimationFrame(draw);
+        }
+        draw();
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+        log('Звезды инициализированы');
+    }
+    
+    function showToast(msg) {
+        const toast = document.createElement('div');
+        toast.className = 'toast';
+        toast.textContent = msg;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 2000);
+        log(`Toast: ${msg}`);
+    }
+    
+    // ========== МЕНЮ ==========
+    function toggleMenu() {
+        document.getElementById('sideMenu').classList.toggle('active');
+        document.getElementById('menuOverlay').classList.toggle('active');
+        log('Меню переключено');
+    }
+    function closeMenu() {
+        document.getElementById('sideMenu').classList.remove('active');
+        document.getElementById('menuOverlay').classList.remove('active');
+    }
+    
+    function switchPage(page) {
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        document.getElementById(`page-${page}`).classList.add('active');
+        log(`Переключено на страницу: ${page}`);
+        if (page === 'main' && map) map.invalidateSize();
+    }
+    
+    // ========== АВТОРИЗАЦИЯ ==========
+    async function register() {
+        const login = document.getElementById('loginInput').value.trim();
+        const password = document.getElementById('passwordInput').value.trim();
+        if (!login || !password) return showToast('Введите логин и пароль');
+        log('Регистрация', { login });
+        
+        const snapshot = await db.ref('users').orderByChild('login').equalTo(login).once('value');
+        if (snapshot.exists()) return showToast('Логин занят');
+        
+        const userId = Date.now().toString();
+        await db.ref(`users/${userId}`).set({
+            login, password: btoa(password), name: login, avatar: '😎', created_at: Date.now()
+        });
+        
+        currentUser = { id: userId, login, name: login, avatar: '😎' };
+        localStorage.setItem('user', JSON.stringify(currentUser));
+        closeModal('authModal');
+        initMap();
+        loadData();
+        showToast('Регистрация успешна!');
+        log('Регистрация успешна', currentUser);
+    }
+    
+    async function login() {
+        const login = document.getElementById('loginInput').value.trim();
+        const password = document.getElementById('passwordInput').value.trim();
+        if (!login || !password) return showToast('Введите логин и пароль');
+        log('Вход', { login });
+        
+        const snapshot = await db.ref('users').orderByChild('login').equalTo(login).once('value');
+        if (!snapshot.exists()) return showToast('Пользователь не найден');
+        
+        let userId, userData;
+        snapshot.forEach(child => { userId = child.key; userData = child.val(); });
+        if (btoa(password) !== userData.password) return showToast('Неверный пароль');
+        
+        currentUser = { id: userId, login, name: userData.name, avatar: userData.avatar || '😎' };
+        localStorage.setItem('user', JSON.stringify(currentUser));
+        closeModal('authModal');
+        initMap();
+        loadData();
+        showToast('Добро пожаловать!');
+        log('Вход успешен', currentUser);
+    }
+    
+    function checkAuth() {
+        const saved = localStorage.getItem('user');
+        if (saved) {
+            currentUser = JSON.parse(saved);
+            log('Авторизация из localStorage', currentUser);
+            initMap();
+            loadData();
+        } else {
+            log('Нет авторизации, показываем окно входа');
+            openModal('authModal');
+        }
+    }
+    
+    function logout() {
+        currentUser = null;
+        localStorage.clear();
+        log('Выход из системы');
+        location.reload();
+    }
+    
+    // ========== КАРТА ==========
+    function initMap() {
+        if (map) return;
+        map = L.map('map').setView([55.751244, 37.618423], 13);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
+        log('Карта инициализирована');
+        
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(pos => {
+                const { latitude, longitude } = pos.coords;
+                userMarker = L.marker([latitude, longitude]).addTo(map);
+                map.setView([latitude, longitude], 15);
+                log('Геолокация получена', { latitude, longitude });
+            }, () => log('Ошибка геолокации'));
+        }
+    }
+    
+    function goToMyLocation() {
+        if (userMarker) {
+            const pos = userMarker.getLatLng();
+            map.setView([pos.lat, pos.lng], 15);
+            showToast('📍 Вы здесь');
+            log('Центрирование на моей позиции');
+        } else {
+            showToast('Включите геолокацию');
+        }
+    }
+    
+    // ========== ОБЪЯВЛЕНИЯ ==========
+    async function loadAds() {
+        const snapshot = await db.ref('ads').once('value');
+        allAds = [];
+        if (snapshot.exists()) snapshot.forEach(child => allAds.push({ id: child.key, ...child.val() }));
+        log('Загружено объявлений', allAds.length);
+        renderAds();
+    }
+    
+    function renderAds() {
+        const search = document.getElementById('adSearch')?.value.toLowerCase() || '';
+        let filtered = [...allAds];
+        
+        if (currentFilter === 'low') filtered = filtered.filter(ad => parseInt(ad.price) < 1000);
+        if (currentFilter === 'mid') filtered = filtered.filter(ad => parseInt(ad.price) >= 1000 && parseInt(ad.price) <= 5000);
+        if (currentFilter === 'high') filtered = filtered.filter(ad => parseInt(ad.price) > 5000);
+        
+        filtered = filtered.filter(ad => ad.title.toLowerCase().includes(search));
+        
+        // Рендер списка
+        document.getElementById('adsList').innerHTML = filtered.map(ad => `
+            <div class="ad-card" onclick="centerMapOnAd(${ad.lat}, ${ad.lng})">
+                <b>${escapeHtml(ad.title)}</b> - ${ad.price}₽<br>
+                <small>📍 ${ad.lat.toFixed(4)}, ${ad.lng.toFixed(4)}</small><br>
+                <small>👤 ${escapeHtml(ad.userLogin)}</small>
+                ${ad.userId === currentUser?.id ? `<button onclick="event.stopPropagation(); extendAd('${ad.id}')" style="margin-top:8px;">🔄 Продлить</button>` : ''}
+            </div>
+        `).join('');
+        
+        // Рендер маркеров на карте (ВСЕ точки, фильтр не скрывает!)
+        if (map && markers) {
+            markers.forEach(m => map.removeLayer(m));
+            markers = [];
+            allAds.forEach(ad => {
+                const marker = L.marker([ad.lat, ad.lng]).addTo(map);
+                marker.bindPopup(`<b>${ad.title}</b><br>💰 ${ad.price}₽`);
+                markers.push(marker);
+            });
+            log('Маркеров на карте', markers.length);
+        }
+    }
+    
+    function filterAds(filter) {
+        currentFilter = filter;
+        document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+        document.querySelector(`.filter-btn[data-filter="${filter}"]`).classList.add('active');
+        log('Фильтр изменен', filter);
+        renderAds();
+    }
+    
+    function centerMapOnAd(lat, lng) {
+        if (map) {
+            map.setView([lat, lng], 18);
+            showToast('📍 Объявление на карте');
+            log('Центрирование на объявлении', { lat, lng });
+        }
+    }
+    
+    async function createAd() {
+        const title = document.getElementById('adTitle').value.trim();
+        const price = document.getElementById('adPrice').value.trim();
+        if (!title || !price) return showToast('Заполните поля');
+        if (!userMarker) return showToast('Включите геолокацию');
+        
+        const pos = userMarker.getLatLng();
+        await db.ref(`ads/${Date.now()}`).set({
+            title, price, lat: pos.lat, lng: pos.lng,
+            userId: currentUser.id, userLogin: currentUser.login,
+            timestamp: Date.now()
+        });
+        showToast('Объявление опубликовано');
+        closeModal('addAdModal');
+        await loadAds();
+        log('Создано объявление', { title, price });
+    }
+    
+    async function extendAd(adId) {
+        await db.ref(`ads/${adId}/timestamp`).set(Date.now());
+        showToast('Объявление продлено');
+        await loadAds();
+        log('Объявление продлено', adId);
+    }
+    
+    async function showMyAds() {
+        const myAds = allAds.filter(ad => ad.userId === currentUser.id);
+        const now = Date.now();
+        document.getElementById('myAdsList').innerHTML = myAds.map(ad => {
+            const hoursLeft = 24 - Math.floor((now - ad.timestamp) / (1000 * 60 * 60));
+            return `
+                <div class="ad-card">
+                    <b>${escapeHtml(ad.title)}</b> - ${ad.price}₽<br>
+                    <small>⏱️ Действует: ${hoursLeft} ч</small><br>
+                    <button onclick="extendAd('${ad.id}'); closeModal('myAdsModal');">🔄 Продлить</button>
+                </div>
+            `;
+        }).join('');
+        if (myAds.length === 0) document.getElementById('myAdsList').innerHTML = '<div style="text-align:center">📭 Нет объявлений</div>';
+        openModal('myAdsModal');
+        log('Мои объявления', myAds.length);
+    }
+    
+    // ========== КОНТАКТЫ ==========
+    async function loadContacts() {
+        const snapshot = await db.ref(`contacts/${currentUser.id}`).once('value');
+        contacts = [];
+        if (snapshot.exists()) {
+            for (const [id, data] of Object.entries(snapshot.val())) {
+                const userSnap = await db.ref(`users/${id}`).once('value');
+                const user = userSnap.val();
+                if (user) contacts.push({ id, login: user.login, name: data.name || user.login, avatar: user.avatar || '👤' });
+            }
+        }
+        log('Загружено контактов', contacts.length);
+        renderContacts();
+    }
+    
+    async function addContact() {
+        const login = document.getElementById('contactLoginInput').value.trim();
+        if (!login) return;
+        const snapshot = await db.ref('users').orderByChild('login').equalTo(login).once('value');
+        if (!snapshot.exists()) return showToast('Пользователь не найден');
+        let contactId;
+        snapshot.forEach(child => contactId = child.key);
+        if (contactId === currentUser.id) return showToast('Нельзя добавить себя');
+        await db.ref(`contacts/${currentUser.id}/${contactId}`).set({ name: login, added_at: Date.now() });
+        showToast('Контакт добавлен');
+        closeModal('addContactModal');
+        await loadContacts();
+        log('Добавлен контакт', login);
+    }
+    
+    function renderContacts() {
+        const search = document.getElementById('contactSearch')?.value.toLowerCase() || '';
+        const filtered = contacts.filter(c => c.name.toLowerCase().includes(search));
+        document.getElementById('contactsList').innerHTML = filtered.map(c => `
+            <div class="contact-item" onclick='openChat(${JSON.stringify(c).replace(/"/g, '&quot;')})'>
+                <div class="contact-avatar">${c.avatar}<span class="online-indicator"></span></div>
+                <div><b>${escapeHtml(c.name)}</b><br><small>@${c.login}</small></div>
+            </div>
+        `).join('');
+    }
+    
+    // ========== ЧАТЫ ==========
+    async function loadChats() {
+        const snapshot = await db.ref(`messages/${currentUser.id}`).once('value');
+        chats = [];
+        if (snapshot.exists()) {
+            for (const [contactId, msgs] of Object.entries(snapshot.val())) {
+                const contact = contacts.find(c => c.id === contactId);
+                if (contact) {
+                    const lastMsg = Object.values(msgs).sort((a,b) => b.timestamp - a.timestamp)[0];
+                    chats.push({ contact, lastMsg });
+                }
+            }
+        }
+        log('Загружено чатов', chats.length);
+        renderChats();
+    }
+    
+    function renderChats() {
+        const search = document.getElementById('chatSearch')?.value.toLowerCase() || '';
+        const filtered = chats.filter(c => c.contact.name.toLowerCase().includes(search));
+        document.getElementById('chatsList').innerHTML = filtered.map(c => `
+            <div class="contact-item" onclick='openChat(${JSON.stringify(c.contact).replace(/"/g, '&quot;')})'>
+                <div class="contact-avatar">${c.contact.avatar}<span class="online-indicator"></span></div>
+                <div style="flex:1">
+                    <b>${escapeHtml(c.contact.name)}</b><br>
+                    <small>${c.lastMsg.type === 'text' ? c.lastMsg.content.substring(0,30) : (c.lastMsg.type === 'audio' ? '🎤 Аудио' : '📎 Файл')}</small>
+                </div>
+                <small>${new Date(c.lastMsg.timestamp).toLocaleTimeString()}</small>
+            </div>
+        `).join('');
+    }
+    
+    function openChat(contact) {
+        currentChat = contact;
+        document.getElementById('chatName').innerText = contact.name;
+        document.getElementById('chatLogin').innerText = '@' + contact.login;
+        document.getElementById('chatContainer').classList.add('active');
+        loadMessages();
+        log('Открыт чат с', contact.name);
+        
+        const ref = db.ref(`messages/${currentUser.id}/${contact.id}`);
+        ref.off();
+        ref.on('child_added', () => loadMessages());
+    }
+    
+    function closeChat() {
+        currentChat = null;
+        document.getElementById('chatContainer').classList.remove('active');
+        log('Чат закрыт');
+    }
+    
+    async function loadMessages() {
+        if (!currentChat) return;
+        const snapshot = await db.ref(`messages/${currentUser.id}/${currentChat.id}`).orderByKey().limitToLast(50).once('value');
+        const messages = [];
+        snapshot.forEach(child => messages.push(child.val()));
+        messages.sort((a,b) => a.timestamp - b.timestamp);
+        log('Загружено сообщений', messages.length);
+        
+        document.getElementById('messages').innerHTML = messages.map(msg => `
+            <div class="message ${msg.from === currentUser.id ? 'out' : 'in'}">
+                <div>${msg.type === 'text' ? escapeHtml(msg.content) : 
+                     msg.type === 'audio' ? `<audio controls src="${msg.content}"></audio>` : 
+                     `<a href="${msg.content}" download="${msg.name}">📎 ${msg.name}</a>`}</div>
+                <div class="message-meta">${msg.from === currentUser.id ? 'Вы' : currentChat.name} • ${new Date(msg.timestamp).toLocaleTimeString()}</div>
+            </div>
+        `).join('');
+        document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
+    }
+    
+    async function sendMessage() {
+        const text = document.getElementById('messageInput').value.trim();
+        if (!text || !currentChat) return;
+        log('Отправка сообщения', { to: currentChat.name, text });
+        
+        const msgId = Date.now().toString();
+        const msgData = { from: currentUser.id, to: currentChat.id, type: 'text', content: text, timestamp: Date.now() };
+        
+        await db.ref(`messages/${currentChat.id}/${currentUser.id}/${msgId}`).set(msgData);
+        await db.ref(`messages/${currentUser.id}/${currentChat.id}/${msgId}`).set(msgData);
+        
+        document.getElementById('messageInput').value = '';
+        await loadMessages();
+        log('Сообщение отправлено');
+    }
+    
+    function selectFile() { document.getElementById('fileInput').click(); }
+    
+    document.getElementById('fileInput').onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file || !currentChat) return;
+        log('Отправка файла', file.name);
+        
+        const reader = new FileReader();
+        reader.onload = async (ev) => {
+            const msgId = Date.now().toString();
+            const msgData = { from: currentUser.id, to: currentChat.id, type: 'file', name: file.name, content: ev.target.result, timestamp: Date.now() };
+            await db.ref(`messages/${currentChat.id}/${currentUser.id}/${msgId}`).set(msgData);
+            await db.ref(`messages/${currentUser.id}/${currentChat.id}/${msgId}`).set(msgData);
+            await loadMessages();
+            log('Файл отправлен');
+        };
+        reader.readAsDataURL(file);
+    };
+    
+    let mediaRecorder = null;
+    async function toggleRecording() {
+        if (mediaRecorder && mediaRecorder.state === 'recording') {
+            mediaRecorder.stop();
+            document.getElementById('recordBtn').style.background = 'linear-gradient(135deg, #667eea, #764ba2)';
+            log('Запись остановлена');
+        } else {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                const chunks = [];
+                mediaRecorder.ondataavailable = e => chunks.push(e.data);
+                mediaRecorder.onstop = () => {
+                    const blob = new Blob(chunks, { type: 'audio/webm' });
+                    const reader = new FileReader();
+                    reader.onload = async () => {
+                        const msgId = Date.now().toString();
+                        const msgData = { from: currentUser.id, to: currentChat.id, type: 'audio', content: reader.result, timestamp: Date.now() };
+                        await db.ref(`messages/${currentChat.id}/${currentUser.id}/${msgId}`).set(msgData);
+                        await db.ref(`messages/${currentUser.id}/${currentChat.id}/${msgId}`).set(msgData);
+                        await loadMessages();
+                        log('Аудио отправлено');
+                    };
+                    reader.readAsDataURL(blob);
+                    stream.getTracks().forEach(t => t.stop());
+                };
+                mediaRecorder.start();
+                document.getElementById('recordBtn').style.background = '#dc3545';
+                setTimeout(() => { if (mediaRecorder?.state === 'recording') toggleRecording(); }, 30000);
+                log('Запись начата');
+            } catch(e) { showToast('Нет доступа к микрофону'); log('Ошибка микрофона', e); }
+        }
+    }
+    
+    function startCall() {
+        if (!currentChat) return;
+        showToast(`📞 Звонок ${currentChat.name}... (WebRTC в разработке)`);
+        log('Звонок (заглушка)', currentChat.name);
+    }
+    
+    // ========== UI ==========
+    function showProfile() { showToast(`👤 ${currentUser.login}\n🆔 ${currentUser.id}`); log('Профиль'); }
+    function openAddContactModal() { openModal('addContactModal'); }
+    function showAddAdModal() { openModal('addAdModal'); }
+    function openModal(id) { document.getElementById(id).classList.add('active'); log('Открыта модалка', id); }
+    function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+    function escapeHtml(str) { return str?.replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'})[m]) || ''; }
+    
+    async function loadData() {
+        if (!currentUser) return;
+        await loadContacts();
+        await loadChats();
+        await loadAds();
+        log('Все данные загружены');
+    }
+    
+    document.getElementById('messageInput')?.addEventListener('input', function() {
+        this.style.height = 'auto';
+        this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+    });
+    
+    document.getElementById('chatSearch')?.addEventListener('input', () => renderChats());
+    document.getElementById('contactSearch')?.addEventListener('input', () => renderContacts());
+    document.getElementById('adSearch')?.addEventListener('input', () => renderAds());
+    
+    initStars();
+    checkAuth();
+</script>
+</body>
+</html>
