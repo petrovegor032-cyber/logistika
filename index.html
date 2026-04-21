@@ -57,6 +57,9 @@
         .modal-btn { flex: 1; padding: 12px; border-radius: 30px; border: none; cursor: pointer; }
         .modal-btn-primary { background: #6B2E8A; color: white; }
         .modal-btn-secondary { background: rgba(255,255,255,0.1); color: white; }
+        .info-text { font-size: 12px; color: #aaa; margin-top: 8px; text-align: center; }
+        .my-id-box { background: rgba(255,255,255,0.1); padding: 8px; border-radius: 12px; margin: 10px 0; text-align: center; }
+        .my-id-box span { font-family: monospace; background: #000; padding: 4px 8px; border-radius: 8px; font-size: 12px; word-break: break-all; }
         @media (max-width: 480px) {
             .message { max-width: 85%; }
             .record-btn { width: 38px; height: 38px; font-size: 16px; }
@@ -72,7 +75,7 @@
 </div>
 
 <div class="search">
-    <input type="text" id="searchInput" placeholder="🔍 Поиск контактов..." oninput="filterContacts()">
+    <input type="text" id="searchInput" placeholder="🔍 Поиск контактов по имени..." oninput="filterContacts()">
 </div>
 
 <div class="container">
@@ -87,6 +90,7 @@
         <div class="menu-user-name" id="menuName">Пользователь</div>
     </div>
     <div class="menu-item" onclick="openMap(); closeMenu()">🗺️ Карта объявлений</div>
+    <div class="menu-item" onclick="openProfileModal(); closeMenu()">👤 Мой профиль</div>
     <div class="menu-item" onclick="logout()">🚪 Выйти</div>
 </div>
 
@@ -115,11 +119,15 @@
 <div class="modal" id="authModal">
     <div class="modal-content">
         <h2>🔐 Авторизация</h2>
-        <input type="text" class="modal-input" id="loginInput" placeholder="Логин">
+        <input type="text" class="modal-input" id="loginInput" placeholder="Придумайте логин">
         <input type="password" class="modal-input" id="passwordInput" placeholder="Пароль">
         <div class="modal-buttons">
             <button class="modal-btn modal-btn-secondary" id="registerBtn">Регистрация</button>
             <button class="modal-btn modal-btn-primary" id="loginBtn">Вход</button>
+        </div>
+        <div class="info-text">
+            📌 После регистрации вы получите свой ID.<br>
+            Дайте этот ID другу, чтобы он мог добавить вас в контакты.
         </div>
     </div>
 </div>
@@ -127,21 +135,32 @@
 <div class="modal" id="addContactModal">
     <div class="modal-content">
         <h2>➕ Добавить контакт</h2>
-        <input type="text" class="modal-input" id="newContactId" placeholder="ID пользователя">
-        <input type="text" class="modal-input" id="newContactName" placeholder="Имя">
+        <div class="my-id-box">
+            📋 Ваш ID:<br>
+            <span id="myUserId">Загрузка...</span>
+            <button onclick="copyMyId()" style="background: none; border: 1px solid #888; border-radius: 8px; padding: 4px 12px; margin-top: 8px; color: white; cursor: pointer;">📋 Копировать</button>
+        </div>
+        <input type="text" class="modal-input" id="newContactLogin" placeholder="Логин друга">
+        <div class="info-text">
+            💡 Спросите у друга его ЛОГИН (тот, который он ввел при регистрации)
+        </div>
         <div class="modal-buttons">
             <button class="modal-btn modal-btn-secondary" onclick="closeModal('addContactModal')">Отмена</button>
-            <button class="modal-btn modal-btn-primary" onclick="addContact()">Добавить</button>
+            <button class="modal-btn modal-btn-primary" onclick="addContactByLogin()">Найти и добавить</button>
         </div>
     </div>
 </div>
 
 <div class="modal" id="profileModal">
     <div class="modal-content">
-        <h2>Мой профиль</h2>
-        <p>ID: <span id="profileId"></span></p>
-        <p>Имя: <span id="profileName"></span></p>
-        <button class="modal-btn modal-btn-secondary" onclick="closeModal('profileModal')">Закрыть</button>
+        <h2>👤 Мой профиль</h2>
+        <p><strong>Логин:</strong> <span id="profileLogin"></span></p>
+        <p><strong>Ваш ID:</strong><br><span id="profileId" style="font-family: monospace; font-size: 12px; word-break: break-all;"></span></p>
+        <button class="modal-btn modal-btn-secondary" onclick="copyProfileId()">📋 Копировать ID</button>
+        <button class="modal-btn modal-btn-primary" onclick="closeModal('profileModal')" style="margin-top: 12px;">Закрыть</button>
+        <div class="info-text" style="margin-top: 16px;">
+            📌 Дайте этот ID другу, чтобы он мог добавить вас.
+        </div>
     </div>
 </div>
 
@@ -160,21 +179,11 @@
         appId: "1:172196854367:web:8ae1b63377a14305e139ea"
     };
 
-    console.log("🔵 [1] Firebase конфиг загружен");
+    console.log("🔵 Firebase конфиг загружен");
 
-    // Инициализация Firebase
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
-    console.log("🟢 [2] Firebase инициализирован");
-
-    // Проверка подключения
-    db.ref('.info/connected').on('value', (snap) => {
-        if (snap.val() === true) {
-            console.log("🟢 [3] Подключение к Firebase установлено");
-        } else {
-            console.log("🔴 [3] Нет подключения к Firebase");
-        }
-    });
+    console.log("🟢 Firebase инициализирован");
 
     // ========== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ==========
     let currentUser = null;
@@ -186,28 +195,26 @@
 
     // ========== АВТОРИЗАЦИЯ ==========
     async function register() {
-        console.log("🔵 [Регистрация] Начата");
         const login = document.getElementById('loginInput').value.trim();
         const password = document.getElementById('passwordInput').value.trim();
         
         if (!login || !password) { 
-            console.log("🔴 [Регистрация] Пустые поля");
+            console.log("🔴 Пустые поля");
             return; 
         }
         
-        console.log("🔵 [Регистрация] Логин:", login);
+        console.log("🔵 Регистрация:", login);
         
         try {
             const usersRef = db.ref('users');
             const snapshot = await usersRef.orderByChild('login').equalTo(login).get();
             
             if (snapshot.exists()) {
-                console.log("🔴 [Регистрация] Логин уже существует");
+                alert('❌ Логин уже существует');
                 return;
             }
             
             const userId = Date.now().toString();
-            console.log("🔵 [Регистрация] Создание пользователя ID:", userId);
             
             await usersRef.child(userId).set({
                 login: login,
@@ -220,33 +227,33 @@
             currentUser = { id: userId, login: login, name: login, avatar: '😎' };
             localStorage.setItem('user', JSON.stringify(currentUser));
             
-            console.log("🟢 [Регистрация] Успешно! Пользователь:", currentUser);
+            alert(`✅ Регистрация успешна!\n\nВаш ID: ${userId}\n\nСохраните его и дайте друзьям!`);
             closeModal('authModal');
             updateUI();
             loadContacts();
         } catch (e) {
-            console.error("🔴 [Регистрация] Ошибка:", e);
+            console.error("🔴 Ошибка:", e);
+            alert("Ошибка: " + e.message);
         }
     }
     
     async function login() {
-        console.log("🔵 [Вход] Начат");
         const login = document.getElementById('loginInput').value.trim();
         const password = document.getElementById('passwordInput').value.trim();
         
         if (!login || !password) { 
-            console.log("🔴 [Вход] Пустые поля");
+            console.log("🔴 Пустые поля");
             return; 
         }
         
-        console.log("🔵 [Вход] Логин:", login);
+        console.log("🔵 Вход:", login);
         
         try {
             const usersRef = db.ref('users');
             const snapshot = await usersRef.orderByChild('login').equalTo(login).get();
             
             if (!snapshot.exists()) {
-                console.log("🔴 [Вход] Пользователь не найден");
+                alert('❌ Пользователь не найден');
                 return;
             }
             
@@ -257,54 +264,100 @@
                 userData = child.val();
             });
             
-            console.log("🔵 [Вход] Найден ID:", userId);
-            
             if (btoa(password) !== userData.password) {
-                console.log("🔴 [Вход] Неверный пароль");
+                alert('❌ Неверный пароль');
                 return;
             }
             
             currentUser = { id: userId, login: login, name: userData.name, avatar: userData.avatar || '😎' };
             localStorage.setItem('user', JSON.stringify(currentUser));
             
-            console.log("🟢 [Вход] Успешно! Пользователь:", currentUser);
+            console.log("🟢 Вход выполнен:", currentUser);
             closeModal('authModal');
             updateUI();
             loadContacts();
         } catch (e) {
-            console.error("🔴 [Вход] Ошибка:", e);
+            console.error("🔴 Ошибка:", e);
+            alert("Ошибка: " + e.message);
         }
     }
     
     function checkAuth() {
-        console.log("🔵 [Auth] Проверка авторизации");
         const saved = localStorage.getItem('user');
         if (saved) {
             currentUser = JSON.parse(saved);
-            console.log("🟢 [Auth] Пользователь авторизован:", currentUser.login);
+            console.log("🟢 Авторизован:", currentUser.login);
             updateUI();
             loadContacts();
         } else {
-            console.log("🟡 [Auth] Не авторизован, показываем модалку");
+            console.log("🟡 Не авторизован");
             openModal('authModal');
         }
     }
     
     function logout() {
-        console.log("🔵 [Logout] Выход из системы");
         currentUser = null;
         localStorage.removeItem('user');
         contacts = [];
         renderContacts();
         openModal('authModal');
         closeChat();
-        console.log("🟢 [Logout] Выход выполнен");
+        console.log("🟢 Выход выполнен");
     }
     
-    // ========== КОНТАКТЫ ==========
+    // ========== КОНТАКТЫ (ПО ЛОГИНУ!) ==========
+    async function addContactByLogin() {
+        const contactLogin = document.getElementById('newContactLogin').value.trim();
+        if (!contactLogin) {
+            alert('Введите логин друга');
+            return;
+        }
+        
+        console.log("🔵 Поиск пользователя по логину:", contactLogin);
+        
+        try {
+            // Ищем пользователя по логину
+            const usersRef = db.ref('users');
+            const snapshot = await usersRef.orderByChild('login').equalTo(contactLogin).get();
+            
+            if (!snapshot.exists()) {
+                alert(`❌ Пользователь с логином "${contactLogin}" не найден`);
+                return;
+            }
+            
+            let contactId = null;
+            let contactData = null;
+            snapshot.forEach((child) => {
+                contactId = child.key;
+                contactData = child.val();
+            });
+            
+            if (contactId === currentUser.id) {
+                alert("❌ Нельзя добавить самого себя");
+                return;
+            }
+            
+            // Добавляем контакт
+            await db.ref('contacts/' + currentUser.id + '/' + contactId).set({
+                name: contactData.name || contactLogin,
+                login: contactLogin,
+                added_at: new Date().toISOString()
+            });
+            
+            alert(`✅ Контакт "${contactLogin}" добавлен!`);
+            document.getElementById('newContactLogin').value = '';
+            closeModal('addContactModal');
+            await loadContacts();
+            
+        } catch (e) {
+            console.error("🔴 Ошибка:", e);
+            alert("Ошибка: " + e.message);
+        }
+    }
+    
     async function loadContacts() {
         if (!currentUser) return;
-        console.log("🔵 [Contacts] Загрузка контактов для:", currentUser.login);
+        console.log("🔵 Загрузка контактов");
         
         try {
             const contactsRef = db.ref('contacts/' + currentUser.id);
@@ -313,66 +366,40 @@
             contacts = [];
             if (snapshot.exists()) {
                 for (const [contactId, contactData] of Object.entries(snapshot.val())) {
+                    // Получаем актуальные данные пользователя
                     const userSnapshot = await db.ref('users/' + contactId).get();
                     const userData = userSnapshot.val();
                     contacts.push({
                         id: contactId,
                         name: contactData.name || userData?.name || contactId,
+                        login: userData?.login || contactData.login || contactId,
                         avatar: userData?.avatar || '👤'
                     });
                 }
             }
-            console.log("🟢 [Contacts] Загружено контактов:", contacts.length);
+            console.log("🟢 Загружено контактов:", contacts.length);
             renderContacts();
         } catch (e) {
-            console.error("🔴 [Contacts] Ошибка:", e);
-        }
-    }
-    
-    async function addContact() {
-        const contactId = document.getElementById('newContactId').value.trim();
-        const contactName = document.getElementById('newContactName').value.trim() || contactId;
-        if (!contactId) return;
-        
-        console.log("🔵 [AddContact] Добавление:", contactId);
-        
-        try {
-            const userSnapshot = await db.ref('users/' + contactId).get();
-            if (!userSnapshot.exists()) {
-                console.log("🔴 [AddContact] Пользователь не найден");
-                return;
-            }
-            
-            await db.ref('contacts/' + currentUser.id + '/' + contactId).set({
-                name: contactName,
-                added_at: new Date().toISOString()
-            });
-            
-            console.log("🟢 [AddContact] Контакт добавлен");
-            await loadContacts();
-            closeModal('addContactModal');
-            document.getElementById('newContactId').value = '';
-            document.getElementById('newContactName').value = '';
-        } catch (e) {
-            console.error("🔴 [AddContact] Ошибка:", e);
+            console.error("🔴 Ошибка:", e);
         }
     }
     
     function renderContacts() {
         const searchTerm = document.getElementById('searchInput').value.toLowerCase();
         let filtered = contacts;
-        if (searchTerm) filtered = contacts.filter(c => c.name.toLowerCase().includes(searchTerm));
+        if (searchTerm) filtered = contacts.filter(c => c.name.toLowerCase().includes(searchTerm) || c.login.toLowerCase().includes(searchTerm));
         
         const container = document.getElementById('contactsList');
         if (!filtered.length) {
-            container.innerHTML = '<div style="text-align:center; padding:40px;">📭 Нет контактов</div>';
+            container.innerHTML = '<div style="text-align:center; padding:40px;">📭 Нет контактов<br><span style="font-size:12px;">Нажмите "➕ Добавить контакт" и введите логин друга</span></div>';
             return;
         }
         container.innerHTML = filtered.map(c => `
-            <div class="contact-item" onclick="openChat('${c.id}')">
+            <div class="contact-item" onclick="openChat('${c.id}', '${c.login}')">
                 <div class="contact-avatar">${c.avatar}</div>
                 <div class="contact-info">
                     <div class="contact-name">${escapeHtml(c.name)}</div>
+                    <div style="font-size: 11px; color: #888;">@${escapeHtml(c.login)}</div>
                 </div>
             </div>
         `).join('');
@@ -381,12 +408,12 @@
     function filterContacts() { renderContacts(); }
     
     // ========== ЧАТ ==========
-    async function openChat(contactId) {
+    async function openChat(contactId, contactLogin) {
         const contact = contacts.find(c => c.id === contactId);
         if (!contact) return;
-        console.log("🔵 [Chat] Открыт чат с:", contact.name);
+        console.log("🔵 Открыт чат с:", contact.name);
         currentChatContact = contact;
-        document.getElementById('chatName').textContent = contact.name;
+        document.getElementById('chatName').textContent = contact.name + " (@" + contact.login + ")";
         document.getElementById('chat').classList.add('active');
         await loadMessages();
         
@@ -395,14 +422,12 @@
         messagesRef.on('child_added', (snapshot) => {
             const msg = snapshot.val();
             if (msg.from === currentUser.id) return;
-            console.log("🔵 [Chat] Новое сообщение от:", msg.from);
             appendMessage(msg.text, msg.time, false);
         });
     }
     
     function closeChat() {
         if (currentChatContact) {
-            console.log("🔵 [Chat] Закрыт чат с:", currentChatContact.name);
             db.ref('messages/' + currentUser.id + '/' + currentChatContact.id).off();
         }
         document.getElementById('chat').classList.remove('active');
@@ -420,7 +445,6 @@
                 messages.push(child.val());
             });
         }
-        console.log("🔵 [Chat] Загружено сообщений:", messages.length);
         renderMessages(messages);
     }
     
@@ -464,7 +488,6 @@
         await db.ref('messages/' + currentUser.id + '/' + currentChatContact.id + '/' + msgId).set(msgData);
         await db.ref('messages/' + currentChatContact.id + '/' + currentUser.id + '/' + msgId).set(msgData);
         
-        console.log("🔵 [Chat] Отправлено сообщение:", text);
         input.value = '';
         input.style.height = 'auto';
         appendMessage(text, time, true);
@@ -473,7 +496,6 @@
     // ========== КАРТА И ОБЪЯВЛЕНИЯ ==========
     function initMap() {
         if (map) return;
-        console.log("🔵 [Map] Инициализация карты");
         map = L.map('map').setView([55.751244, 37.618423], 13);
         L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
             attribution: '&copy; OpenStreetMap',
@@ -490,9 +512,8 @@
                 window.myMarker = L.marker([lat, lng]).addTo(map);
                 map.setView([lat, lng], 15);
                 loadAds();
-                console.log("🟢 [Map] GPS получен:", lat, lng);
             }, (err) => {
-                console.error("🔴 [Map] GPS ошибка:", err);
+                console.error("GPS ошибка:", err);
             });
         }
     }
@@ -513,7 +534,6 @@
                     adMarkers.push(marker);
                 }
             }
-            console.log("🟢 [Map] Загружено объявлений:", adMarkers.length);
         }
     }
     
@@ -521,7 +541,7 @@
         const text = document.getElementById('adText').value;
         const price = document.getElementById('adPrice').value;
         if (!text || !currentLocation) { 
-            console.log("🔴 [Ad] Нет текста или GPS");
+            alert('Введите текст и включите GPS');
             return; 
         }
         
@@ -534,7 +554,6 @@
             created_at: new Date().toISOString()
         });
         
-        console.log("🟢 [Ad] Объявление создано:", text);
         document.getElementById('adText').value = '';
         document.getElementById('adPrice').value = '';
         await loadAds();
@@ -551,14 +570,12 @@
     }
     
     function openMap() {
-        console.log("🔵 [Map] Открытие карты");
         document.getElementById('mapContainer').classList.add('active');
         if (!map) initMap();
         else { map.invalidateSize(); loadAds(); }
     }
     
     function closeMap() { 
-        console.log("🔵 [Map] Закрытие карты");
         document.getElementById('mapContainer').classList.remove('active'); 
     }
     
@@ -587,21 +604,38 @@
     
     function openProfileModal() {
         if (currentUser) {
+            document.getElementById('profileLogin').textContent = currentUser.login;
             document.getElementById('profileId').textContent = currentUser.id;
-            document.getElementById('profileName').textContent = currentUser.name;
         }
         openModal('profileModal');
     }
     
-    function openAddContactModal() { 
-        openModal('addContactModal'); 
+    function openAddContactModal() {
+        if (currentUser) {
+            document.getElementById('myUserId').textContent = currentUser.id;
+        }
+        openModal('addContactModal');
+    }
+    
+    function copyMyId() {
+        if (currentUser) {
+            navigator.clipboard.writeText(currentUser.id);
+            alert("✅ ID скопирован!");
+        }
+    }
+    
+    function copyProfileId() {
+        if (currentUser) {
+            navigator.clipboard.writeText(currentUser.id);
+            alert("✅ ID скопирован!");
+        }
     }
     
     function updateUI() {
         if (currentUser) {
             document.getElementById('headerAvatar').textContent = currentUser.avatar || '😎';
             document.getElementById('menuAvatar').textContent = currentUser.avatar || '😎';
-            document.getElementById('menuName').textContent = currentUser.name || currentUser.login;
+            document.getElementById('menuName').textContent = currentUser.login;
         }
     }
     
@@ -627,7 +661,7 @@
         });
     }
     
-    console.log("🟢 [Init] Приложение загружено");
+    console.log("🟢 Приложение загружено");
     checkAuth();
 </script>
 </body>
