@@ -1134,14 +1134,19 @@
         if (!text || !currentChat) return;
         
         const msgId = Date.now().toString();
-        const msgData = { from: currentUser.id, to: currentChat.id, type: 'text', content: text, timestamp: Date.now() };
+        const msgData = {
+            from: currentUser.id,
+            to: currentChat.id,
+            type: 'text',
+            content: text,
+            timestamp: Date.now()
+        };
         
         await db.ref(`messages/${currentChat.id}/${currentUser.id}/${msgId}`).set(msgData);
         await db.ref(`messages/${currentUser.id}/${currentChat.id}/${msgId}`).set(msgData);
         
         document.getElementById('messageInput').value = '';
         await loadMessages();
-        console.log('✅ Сообщение отправлено:', text);
     }
     
     function selectFile() { document.getElementById('fileInput').click(); }
