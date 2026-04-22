@@ -641,20 +641,27 @@
             for (const spark of sparks) {
                 if (spark.life < spark.maxLife) {
                     spark.life++;
-                    spark.alpha = Math.sin(Math.PI * spark.life / spark.maxLife);
+                    let alphaValue = Math.sin(Math.PI * spark.life / spark.maxLife);
+                    // Защита от отрицательного радиуса
+                    if (alphaValue < 0) alphaValue = 0;
+                    spark.alpha = alphaValue;
                 } else {
                     spark.life = 0;
                     spark.x = Math.random() * canvas.width;
                     spark.y = Math.random() * canvas.height;
                     spark.color = colors[Math.floor(Math.random() * colors.length)];
+                    spark.radius = 3 + Math.random() * 5;
                 }
                 
-                ctx.beginPath();
-                ctx.arc(spark.x, spark.y, spark.radius * spark.alpha, 0, Math.PI * 2);
-                ctx.fillStyle = spark.color;
-                ctx.shadowBlur = 10;
-                ctx.shadowColor = spark.color;
-                ctx.fill();
+                const currentRadius = spark.radius * spark.alpha;
+                if (currentRadius > 0) {
+                    ctx.beginPath();
+                    ctx.arc(spark.x, spark.y, currentRadius, 0, Math.PI * 2);
+                    ctx.fillStyle = spark.color;
+                    ctx.shadowBlur = 10;
+                    ctx.shadowColor = spark.color;
+                    ctx.fill();
+                }
             }
             
             requestAnimationFrame(draw);
