@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>AudioDisk - Полный функционал</title>
+    <title>AudioDisk - Мессенджер</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
@@ -68,6 +68,18 @@
         
         .page.active { display: block; }
         
+        /* Главная страница с чатами */
+        #page-main {
+            padding: 0;
+        }
+        
+        .chats-header {
+            padding: 12px;
+            font-size: 18px;
+            font-weight: bold;
+            color: rgba(255,255,255,0.7);
+        }
+        
         .search {
             padding: 12px;
             margin-bottom: 12px;
@@ -88,7 +100,7 @@
             display: flex;
             align-items: center;
             padding: 12px;
-            margin: 8px 0;
+            margin: 8px 12px;
             background: rgba(255, 255, 255, 0.05);
             border-radius: 16px;
             border: 1px solid rgba(255, 255, 255, 0.1);
@@ -293,6 +305,7 @@
             margin-top: 8px;
         }
         
+        /* Сендвич-панель с прокруткой */
         .side-menu {
             position: fixed;
             top: 0;
@@ -305,6 +318,9 @@
             transition: left 0.3s ease;
             border-right: 1px solid rgba(255, 255, 255, 0.2);
             padding: 80px 20px 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
         }
         
         .side-menu.active { left: 0; }
@@ -329,6 +345,13 @@
             border-radius: 16px;
             cursor: pointer;
             text-align: center;
+        }
+        
+        /* Кнопка выхода всегда видна */
+        .menu-item.logout {
+            margin-top: auto;
+            background: rgba(220, 53, 69, 0.3);
+            border: 1px solid rgba(220, 53, 69, 0.5);
         }
         
         .my-location-btn {
@@ -410,7 +433,6 @@
             max-width: 200px;
         }
 
-        /* Фикс для плеера у отправителя */
         .message.out audio {
             display: block;
             max-width: 200px;
@@ -430,8 +452,15 @@
     <h2>✨ AudioDisk</h2>
 </div>
 
-<!-- Основная страница с картой -->
+<!-- ГЛАВНАЯ СТРАНИЦА - ЧАТЫ -->
 <div id="page-main" class="page active">
+    <div class="chats-header">💬 Чаты</div>
+    <div class="search"><input type="text" id="chatSearch" placeholder="🔍 Поиск чатов..."></div>
+    <div id="chatsList"></div>
+</div>
+
+<!-- Страница карты -->
+<div id="page-map" class="page">
     <div id="map"></div>
     <button class="my-location-btn" onclick="goToMyLocation()">📍</button>
     <div style="display: flex; gap: 8px; margin: 12px 0;">
@@ -439,12 +468,6 @@
         <button class="btn-icon" onclick="showAddAdModal()">➕</button>
     </div>
     <div id="adsList"></div>
-</div>
-
-<!-- Страница чатов -->
-<div id="page-chats" class="page">
-    <div class="search"><input type="text" id="chatSearch" placeholder="🔍 Поиск чатов..."></div>
-    <div id="chatsList"></div>
 </div>
 
 <!-- Страница контактов -->
@@ -476,10 +499,9 @@
     <div class="menu-item" onclick="showProfileModal(); closeMenu()">👤 Мой профиль</div>
     <div class="menu-item" onclick="showMyAds(); closeMenu()">📋 Мои объявления</div>
     <div class="menu-item" onclick="showStatusModal(); closeMenu()">📱 Мой статус</div>
-    <div class="menu-item" onclick="switchPage('chats'); closeMenu();">💬 Чаты</div>
+    <div class="menu-item" onclick="switchPage('map'); closeMenu();">🗺️ Карта</div>
     <div class="menu-item" onclick="switchPage('contacts'); closeMenu();">📞 Контакты</div>
-    <div class="menu-item" onclick="switchPage('main'); closeMenu();">🗺️ Карта</div>
-    <div class="menu-item" onclick="logout(); closeMenu()">🚪 Выйти</div>
+    <div class="menu-item logout" onclick="logout(); closeMenu()">🚪 Выйти</div>
 </div>
 <div class="menu-overlay" id="menuOverlay" onclick="closeMenu()"></div>
 
@@ -647,17 +669,14 @@
             };
         }
         
-        // Начинаем с 0 искр
         sparks = [];
         
         let nextSpawnTimeout = null;
         
         function scheduleSpawn() {
-            // Случайная задержка от 8 до 25 секунд
             const delay = (8000 + Math.random() * 17000);
             
             nextSpawnTimeout = setTimeout(() => {
-                // Количество новых искр: 1, 2 или 3
                 const count = 1 + Math.floor(Math.random() * 3);
                 
                 for (let i = 0; i < count; i++) {
@@ -665,8 +684,6 @@
                 }
                 
                 console.log(`✨ Появилось ${count} искр(и)`);
-                
-                // Планируем следующее появление
                 scheduleSpawn();
             }, delay);
         }
@@ -674,23 +691,19 @@
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
-            // Обновляем и рисуем искры
             for (let i = 0; i < sparks.length; i++) {
                 const spark = sparks[i];
                 
                 if (spark.life < spark.maxLife) {
                     spark.life++;
                     
-                    // Плавное появление и исчезновение
                     const progress = spark.life / spark.maxLife;
                     let alpha = Math.sin(Math.PI * progress);
-                    // Мерцание в пике
                     if (progress > 0.3 && progress < 0.7) {
                         alpha = alpha * (0.6 + Math.random() * 0.5);
                     }
                     spark.alpha = Math.min(0.9, Math.max(0, alpha));
                     
-                    // Пульсация размера
                     const pulseRadius = spark.radius * (0.7 + Math.sin(progress * Math.PI * 2 * spark.pulseSpeed) * 0.3);
                     
                     if (spark.alpha > 0.05) {
@@ -703,7 +716,6 @@
                         ctx.fill();
                     }
                 } else {
-                    // Искра исчезла — удаляем
                     sparks.splice(i, 1);
                     i--;
                 }
@@ -714,7 +726,6 @@
             requestAnimationFrame(draw);
         }
         
-        // Запускаем
         scheduleSpawn();
         draw();
     }
@@ -765,7 +776,7 @@
     function switchPage(page) {
         document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
         document.getElementById(`page-${page}`).classList.add('active');
-        if (page === 'main' && map) map.invalidateSize();
+        if (page === 'map' && map) map.invalidateSize();
     }
     
     // ========== АВТОРИЗАЦИЯ ==========
@@ -821,7 +832,7 @@
             initMap();
             loadData();
             setupMessageListener();
-            requestNotificationPermission();  // ← ДОБАВИТЬ ЭТУ СТРОКУ
+            requestNotificationPermission();
         } else {
             openModal('authModal');
         }
@@ -988,9 +999,11 @@
     }
     
     function renderAds() {
-        const search = document.getElementById('adSearch')?.value.toLowerCase() || '';
-        let filtered = allAds;
-        if (search) filtered = allAds.filter(ad => ad.text.toLowerCase().includes(search));
+        const search = document.getElementById('adSearch')?.value?.toLowerCase() || '';
+        let filtered = (allAds || []).filter(ad => ad && ad.text);
+        if (search) {
+            filtered = filtered.filter(ad => ad.text.toLowerCase().includes(search));
+        }
         
         document.getElementById('adsList').innerHTML = filtered.map(ad => `
             <div class="ad-card" onclick="centerMapOnAd(${ad.lat}, ${ad.lng})">
@@ -999,7 +1012,7 @@
                     <div style="flex:1">
                         <b>${escapeHtml(ad.text)}</b><br>
                         ${ad.price ? `<small>💰 ${ad.price}₽</small><br>` : ''}
-                        <small>📍 ${ad.lat.toFixed(4)}, ${ad.lng.toFixed(4)}</small><br>
+                        <small>📍 ${ad.lat?.toFixed(4) || '0'}, ${ad.lng?.toFixed(4) || '0'}</small><br>
                         <small>👤 ${escapeHtml(ad.userLogin)}</small>
                     </div>
                     ${ad.userId === currentUser?.id ? `
@@ -1050,10 +1063,6 @@
         }
     }
     
-    function filterAds(filter) {
-        renderAds();
-    }
-    
     function centerMapOnAd(lat, lng) {
         if (map) {
             map.setView([lat, lng], 18);
@@ -1084,27 +1093,16 @@
         openModal('myAdsModal');
     }
     
-    function openChat(contact) {
-        if (!contact) return;
-        
-        currentChat = contact;
-        document.getElementById('chatName').innerText = contact.name;
-        document.getElementById('chatLogin').innerText = '@' + contact.login;
-        document.getElementById('chatContainer').classList.add('active');
-        
-        if (window.chatListenerRef) {
-            window.chatListenerRef.off();
+    function openChatFromAd(userId) {
+        closeModal('myAdsModal');
+        closeModal('addAdModal');
+        switchPage('main');
+        const contact = contacts.find(c => c.id === userId);
+        if (contact) {
+            openChat(contact);
+        } else {
+            showToast('Сначала добавьте этого пользователя в контакты');
         }
-        
-        window.chatListenerRef = db.ref(`messages/${currentUser.id}/${contact.id}`);
-        window.chatListenerRef.on('child_added', () => {
-            loadMessages();
-        });
-        
-        loadMessages().then(() => {
-            const container = document.getElementById('messages');
-            if (container) container.scrollTop = container.scrollHeight;
-        });
     }
     
     // ========== КОНТАКТЫ ==========
@@ -1171,7 +1169,7 @@
     }
     
     function renderContacts() {
-        const search = document.getElementById('contactSearch')?.value.toLowerCase() || '';
+        const search = document.getElementById('contactSearch')?.value?.toLowerCase() || '';
         const filtered = contacts.filter(c => c.name.toLowerCase().includes(search));
         document.getElementById('contactsList').innerHTML = filtered.map(c => `
             <div class="contact-item" onclick='openChat(${JSON.stringify(c).replace(/"/g, '&quot;')})'>
@@ -1198,20 +1196,43 @@
     }
     
     function renderChats() {
-        const search = document.getElementById('chatSearch')?.value.toLowerCase() || '';
+        const search = document.getElementById('chatSearch')?.value?.toLowerCase() || '';
         const filtered = chats.filter(c => c.contact.name.toLowerCase().includes(search));
         document.getElementById('chatsList').innerHTML = filtered.map(c => `
             <div class="contact-item" onclick='openChat(${JSON.stringify(c.contact).replace(/"/g, '&quot;')})'>
                 <div class="contact-avatar">${c.contact.avatar}<span class="online-indicator"></span></div>
                 <div style="flex:1">
                     <b>${escapeHtml(c.contact.name)}</b><br>
-                    <small>${c.lastMsg.type === 'text' ? c.lastMsg.content.substring(0,30) : (c.lastMsg.type === 'audio' ? '🎤 Аудио' : '📎 Файл')}</small>
+                    <small>${c.lastMsg.type === 'text' ? (c.lastMsg.content || '').substring(0,30) : (c.lastMsg.type === 'audio' ? '🎤 Аудио' : '📎 Файл')}</small>
                 </div>
                 <small>${new Date(c.lastMsg.timestamp).toLocaleTimeString()}</small>
             </div>
         `).join('');
     }
+    
+    function openChat(contact) {
+        if (!contact) return;
         
+        currentChat = contact;
+        document.getElementById('chatName').innerText = contact.name;
+        document.getElementById('chatLogin').innerText = '@' + contact.login;
+        document.getElementById('chatContainer').classList.add('active');
+        
+        if (window.chatListenerRef) {
+            window.chatListenerRef.off();
+        }
+        
+        window.chatListenerRef = db.ref(`messages/${currentUser.id}/${contact.id}`);
+        window.chatListenerRef.on('child_added', () => {
+            loadMessages();
+        });
+        
+        loadMessages().then(() => {
+            const container = document.getElementById('messages');
+            if (container) container.scrollTop = container.scrollHeight;
+        });
+    }
+    
     function closeChat() {
         if (window.chatListenerRef) {
             window.chatListenerRef.off();
@@ -1222,7 +1243,32 @@
         console.log('✅ Чат закрыт');
     }
     
-    // ========== ЧАТЫ (ТВОЯ РАБОЧАЯ ВЕРСИЯ) ==========
+    async function loadMessages() {
+        if (!currentChat) return;
+        
+        const snapshot = await db.ref(`messages/${currentUser.id}/${currentChat.id}`).orderByKey().limitToLast(50).once('value');
+        const messages = [];
+        snapshot.forEach(child => messages.push(child.val()));
+        messages.sort((a,b) => a.timestamp - b.timestamp);
+        
+        const container = document.getElementById('messages');
+        if (container) {
+            if (messages.length === 0) {
+                container.innerHTML = '<div style="text-align:center; padding:40px;">💬 Нет сообщений</div>';
+            } else {
+                container.innerHTML = messages.map(msg => `
+                    <div class="message ${msg.from === currentUser.id ? 'out' : 'in'}">
+                        <div>${msg.type === 'text' ? escapeHtml(msg.content) : 
+                             msg.type === 'audio' ? `<audio controls src="${msg.content}" class="audio-player"></audio>` : 
+                             msg.type === 'file' ? `<a href="${msg.content}" download="${msg.name}" style="color:white;">📎 ${msg.name}</a>` : 
+                             msg.type === 'photo' ? `<img src="${msg.content}" style="max-width:200px; border-radius:12px;">` : 
+                             msg.content}</div>
+                        <div class="message-meta">${msg.from === currentUser.id ? 'Вы' : currentChat.name} • ${new Date(msg.timestamp).toLocaleTimeString()}</div>
+                    </div>
+                `).join('');
+            }
+        }
+    }
     
     async function sendMessage() {
         const text = document.getElementById('messageInput').value.trim();
@@ -1243,36 +1289,8 @@
         document.getElementById('messageInput').value = '';
         await loadMessages();
         
-        // СКРОЛЛ ВНИЗ
         const container = document.getElementById('messages');
         if (container) container.scrollTop = container.scrollHeight;
-    }
-    
-    async function loadMessages() {
-        if (!currentChat) return;
-        
-        const snapshot = await db.ref(`messages/${currentUser.id}/${currentChat.id}`).orderByKey().limitToLast(50).once('value');
-        const messages = [];
-        snapshot.forEach(child => messages.push(child.val()));
-        messages.sort((a,b) => a.timestamp - b.timestamp);
-        
-        const container = document.getElementById('messages');
-        if (container) {
-            if (messages.length === 0) {
-                container.innerHTML = '<div style="text-align:center; padding:40px;">💬 Нет сообщений</div>';
-            } else {
-                container.innerHTML = messages.map(msg => `
-                    <div class="message ${msg.from === currentUser.id ? 'out' : 'in'}">
-                        <div>${msg.type === 'text' ? escapeHtml(msg.content) : 
-                             msg.type === 'audio' ? `<audio controls src="${msg.content}"></audio>` : 
-                             msg.type === 'file' ? `<a href="${msg.content}" download="${msg.name}">📎 ${msg.name}</a>` : 
-                             msg.content}</div>
-                        <div class="message-meta">${msg.from === currentUser.id ? 'Вы' : currentChat.name} • ${new Date(msg.timestamp).toLocaleTimeString()}</div>
-                    </div>
-                `).join('');
-            }
-            // НЕТ СКРОЛЛА ЗДЕСЬ — ТОЛЬКО ПРИ ОТПРАВКЕ
-        }
     }
     
     function selectFile() {
@@ -1314,6 +1332,8 @@
                         await db.ref(`messages/${currentChat.id}/${currentUser.id}/${msgId}`).set(msgData);
                         await db.ref(`messages/${currentUser.id}/${currentChat.id}/${msgId}`).set(msgData);
                         await loadMessages();
+                        const container = document.getElementById('messages');
+                        if (container) container.scrollTop = container.scrollHeight;
                         console.log('✅ Аудио отправлено');
                     };
                     reader.readAsDataURL(blob);
