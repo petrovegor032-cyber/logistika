@@ -609,7 +609,7 @@
     let selectedAdIcon = '📌';
     let mediaRecorder = null;
     
-    // ========== ИСКОРКИ (разноцветные, вспыхивают рандомно) ==========
+    // ========== ИСКОРКИ ==========
     function initSparks() {
         const canvas = document.getElementById('sparks-canvas');
         const ctx = canvas.getContext('2d');
@@ -642,7 +642,6 @@
                 if (spark.life < spark.maxLife) {
                     spark.life++;
                     let alphaValue = Math.sin(Math.PI * spark.life / spark.maxLife);
-                    // Защита от отрицательного радиуса
                     if (alphaValue < 0) alphaValue = 0;
                     spark.alpha = alphaValue;
                 } else {
@@ -717,6 +716,7 @@
         closeModal('authModal');
         initMap();
         loadData();
+        setupMessageListener();
         showToast('Регистрация успешна!');
     }
     
@@ -738,6 +738,7 @@
         closeModal('authModal');
         initMap();
         loadData();
+        setupMessageListener();
         showToast('Добро пожаловать!');
     }
     
@@ -748,6 +749,7 @@
             db.ref(`users/${currentUser.id}/online`).set(true);
             initMap();
             loadData();
+            setupMessageListener();
         } else {
             openModal('authModal');
         }
@@ -800,7 +802,7 @@
         loadChats();
     }
     
-    // ========== СТАТУС (временный пост) ==========
+    // ========== СТАТУС ==========
     async function postStatus() {
         const text = document.getElementById('statusText').value.trim();
         const photoFile = document.getElementById('statusPhoto').files[0];
@@ -1010,27 +1012,16 @@
         openModal('myAdsModal');
     }
     
-    function openChat(contact) {
-        if (!contact) return;
-        
-        currentChat = contact;
-        document.getElementById('chatName').innerText = contact.name;
-        document.getElementById('chatLogin').innerText = '@' + contact.login;
-        document.getElementById('chatContainer').classList.add('active');
-        
-        // Очищаем старый слушатель чата
-        if (window.chatListenerRef) {
-            window.chatListenerRef.off();
+    function openChatFromAd(userId) {
+        closeModal('myAdsModal');
+        closeModal('addAdModal');
+        switchPage('chats');
+        const contact = contacts.find(c => c.id === userId);
+        if (contact) {
+            openChat(contact);
+        } else {
+            showToast('Сначала добавьте этого пользователя в контакты');
         }
-        
-        // Устанавливаем новый слушатель для этого чата
-        window.chatListenerRef = db.ref(`messages/${currentUser.id}/${contact.id}`);
-        window.chatListenerRef.on('child_added', () => {
-            loadMessages();
-        });
-        
-        loadMessages();
-        console.log('✅ Чат открыт с:', contact.name);
     }
     
     // ========== КОНТАКТЫ ==========
@@ -1046,11 +1037,10 @@
         }
         renderContacts();
     }
-
+    
     function setupMessageListener() {
         if (!currentUser) return;
         
-        // Слушатель для обновления списка чатов при новых сообщениях
         const messagesRef = db.ref(`messages/${currentUser.id}`);
         if (window.globalListenerRef) {
             window.globalListenerRef.off();
@@ -1058,7 +1048,6 @@
         window.globalListenerRef = messagesRef;
         messagesRef.on('child_added', () => {
             loadChats();
-            // Если чат открыт с тем же контактом, обновляем сообщения
             if (currentChat) {
                 loadMessages();
             }
@@ -1125,15 +1114,24 @@
     }
     
     function openChat(contact) {
+        if (!contact) return;
+        
         currentChat = contact;
         document.getElementById('chatName').innerText = contact.name;
         document.getElementById('chatLogin').innerText = '@' + contact.login;
         document.getElementById('chatContainer').classList.add('active');
-        loadMessages();
         
-        const ref = db.ref(`messages/${currentUser.id}/${contact.id}`);
-        ref.off();
-        ref.on('child_added', () => loadMessages());
+        if (window.chatListenerRef) {
+            window.chatListenerRef.off();
+        }
+        
+        window.chatListenerRef = db.ref(`messages/${currentUser.id}/${contact.id}`);
+        window.chatListenerRef.on('child_added', () => {
+            loadMessages();
+        });
+        
+        loadMessages();
+        console.log('✅ Чат открыт с:', contact.name);
     }
     
     function closeChat() {
