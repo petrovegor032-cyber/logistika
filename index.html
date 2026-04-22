@@ -727,6 +727,10 @@
         setTimeout(() => toast.remove(), 2000);
     }
 
+    function selectFile() {
+        document.getElementById('fileInput').click();
+    }    
+
     // ========== УВЕДОМЛЕНИЯ ==========
     function requestNotificationPermission() {
         if ('Notification' in window) {
