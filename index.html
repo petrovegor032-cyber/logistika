@@ -1292,8 +1292,7 @@
                     </div>
                 `).join('');
             }
-            container.scrollTop = container.scrollHeight;
-            console.log('🟢 [TRACE] Сообщения отображены, скролл вниз');
+            console.log('🟢 [TRACE] Сообщения отображены');
         }
     }
     
@@ -1334,11 +1333,11 @@
         console.log('🔵 [TRACE] Вызов loadMessages...');
         await loadMessages();
         
-        // Скролл вниз после отправки
+        // Скролл вниз только при отправке
         const container = document.getElementById('messages');
         if (container) container.scrollTop = container.scrollHeight;
         
-        console.log('🟢 [TRACE] Отправка завершена');
+        console.log('🟢 [TRACE] Отправка завершена, скролл вниз');
     }
     
     function selectFile() { document.getElementById('fileInput').click(); }
