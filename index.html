@@ -1122,8 +1122,13 @@
     }
     
     function closeChat() {
+        if (window.chatListenerRef) {
+            window.chatListenerRef.off();
+            window.chatListenerRef = null;
+        }
         currentChat = null;
         document.getElementById('chatContainer').classList.remove('active');
+        console.log('✅ Чат закрыт');
     }
     
     async function loadMessages() {
