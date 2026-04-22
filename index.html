@@ -1010,16 +1010,27 @@
         openModal('myAdsModal');
     }
     
-    function openChatFromAd(userId) {
-        closeModal('myAdsModal');
-        closeModal('addAdModal');
-        switchPage('chats');
-        const contact = contacts.find(c => c.id === userId);
-        if (contact) {
-            openChat(contact);
-        } else {
-            showToast('Сначала добавьте этого пользователя в контакты');
+    function openChat(contact) {
+        if (!contact) return;
+        
+        currentChat = contact;
+        document.getElementById('chatName').innerText = contact.name;
+        document.getElementById('chatLogin').innerText = '@' + contact.login;
+        document.getElementById('chatContainer').classList.add('active');
+        
+        // Очищаем старый слушатель чата
+        if (window.chatListenerRef) {
+            window.chatListenerRef.off();
         }
+        
+        // Устанавливаем новый слушатель для этого чата
+        window.chatListenerRef = db.ref(`messages/${currentUser.id}/${contact.id}`);
+        window.chatListenerRef.on('child_added', () => {
+            loadMessages();
+        });
+        
+        loadMessages();
+        console.log('✅ Чат открыт с:', contact.name);
     }
     
     // ========== КОНТАКТЫ ==========
