@@ -73,13 +73,6 @@
             padding: 0;
         }
         
-        .chats-header {
-            padding: 12px;
-            font-size: 18px;
-            font-weight: bold;
-            color: rgba(255,255,255,0.7);
-        }
-        
         .search {
             padding: 12px;
             margin-bottom: 12px;
@@ -347,9 +340,7 @@
             text-align: center;
         }
         
-        /* Кнопка выхода всегда видна */
-        .menu-item.logout {
-            margin-top: auto;
+        .menu-item.danger {
             background: rgba(220, 53, 69, 0.3);
             border: 1px solid rgba(220, 53, 69, 0.5);
         }
@@ -422,6 +413,13 @@
             cursor: pointer;
         }
         
+        .profile-avatar-img {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            object-fit: cover;
+        }
+        
         .status-post {
             background: rgba(255,255,255,0.05);
             border-radius: 16px;
@@ -441,6 +439,51 @@
         .message.in audio {
             max-width: 200px;
         }
+        
+        .delete-contact {
+            background: none;
+            border: none;
+            color: #ff4444;
+            font-size: 20px;
+            cursor: pointer;
+            padding: 8px;
+            margin-left: 8px;
+        }
+        
+        .blocked-badge {
+            background: rgba(255,0,0,0.3);
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 10px;
+            margin-left: 8px;
+        }
+        
+        .contact-actions {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        
+        .message-image {
+            max-width: 200px;
+            max-height: 200px;
+            border-radius: 12px;
+            cursor: pointer;
+        }
+        
+        .message-video {
+            max-width: 200px;
+            border-radius: 12px;
+        }
+        
+        .message-file {
+            color: white;
+            text-decoration: none;
+            background: rgba(255,255,255,0.1);
+            padding: 4px 8px;
+            border-radius: 8px;
+            display: inline-block;
+        }
     </style>
 </head>
 <body>
@@ -454,7 +497,6 @@
 
 <!-- ГЛАВНАЯ СТРАНИЦА - ЧАТЫ -->
 <div id="page-main" class="page active">
-    <div class="chats-header">💬 Чаты</div>
     <div class="search"><input type="text" id="chatSearch" placeholder="🔍 Поиск чатов..."></div>
     <div id="chatsList"></div>
 </div>
@@ -482,6 +524,7 @@
     <div class="chat-header">
         <button class="btn-icon" onclick="closeChat()" style="background:none;">←</button>
         <div style="flex:1"><div id="chatName" style="font-weight:bold"></div><div id="chatLogin" style="font-size:11px"></div></div>
+        <button class="btn-icon" onclick="toggleBlockUser()" id="blockUserBtn">🚫</button>
         <button class="btn-icon" onclick="startCall()">📞</button>
     </div>
     <div class="messages" id="messages"></div>
@@ -490,7 +533,7 @@
         <button class="btn-icon" id="recordBtn" onclick="toggleRecording()">🎤</button>
         <textarea class="message-input" id="messageInput" placeholder="Сообщение" rows="1"></textarea>
         <button class="btn-icon" onclick="sendMessage()">✏️</button>
-        <input type="file" id="fileInput" style="display:none" accept="image/*,video/*,application/pdf">
+        <input type="file" id="fileInput" style="display:none" accept="*/*">
     </div>
 </div>
 
@@ -499,9 +542,11 @@
     <div class="menu-item" onclick="showProfileModal(); closeMenu()">👤 Мой профиль</div>
     <div class="menu-item" onclick="showMyAds(); closeMenu()">📋 Мои объявления</div>
     <div class="menu-item" onclick="showStatusModal(); closeMenu()">📱 Мой статус</div>
+    <div class="menu-item" onclick="switchPage('main'); closeMenu();">💬 Чаты</div>
     <div class="menu-item" onclick="switchPage('map'); closeMenu();">🗺️ Карта</div>
     <div class="menu-item" onclick="switchPage('contacts'); closeMenu();">📞 Контакты</div>
-    <div class="menu-item logout" onclick="logout(); closeMenu()">🚪 Выйти</div>
+    <div class="menu-item" onclick="logout(); closeMenu()">🚪 Выйти</div>
+    <div class="menu-item danger" onclick="deleteAccount(); closeMenu()">⚠️ Удалить аккаунт</div>
 </div>
 <div class="menu-overlay" id="menuOverlay" onclick="closeMenu()"></div>
 
@@ -640,6 +685,7 @@
     let userMarker = null;
     let selectedAdIcon = '📌';
     let mediaRecorder = null;
+    let blockedUsers = [];
     
     // ========== ИСКОРКИ ==========
     function initSparks() {
@@ -838,17 +884,103 @@
         }
     }
     
-    function logout() {
-        if (currentUser) db.ref(`users/${currentUser.id}/online`).set(false);
+    async function logout() {
+        if (currentUser) await db.ref(`users/${currentUser.id}/online`).set(false);
         currentUser = null;
         localStorage.clear();
         location.reload();
     }
     
+    async function deleteAccount() {
+        if (!confirm('Вы уверены? Ваш аккаунт и все данные будут удалены безвозвратно!')) return;
+        
+        // Удаляем сообщения
+        const messagesRef = db.ref(`messages/${currentUser.id}`);
+        const messagesSnap = await messagesRef.once('value');
+        if (messagesSnap.exists()) {
+            for (const [contactId, msgs] of Object.entries(messagesSnap.val())) {
+                for (const msgId of Object.keys(msgs)) {
+                    await db.ref(`messages/${contactId}/${currentUser.id}/${msgId}`).remove();
+                }
+            }
+            await messagesRef.remove();
+        }
+        
+        // Удаляем контакты
+        const contactsRef = db.ref(`contacts/${currentUser.id}`);
+        const contactsSnap = await contactsRef.once('value');
+        if (contactsSnap.exists()) {
+            for (const contactId of Object.keys(contactsSnap.val())) {
+                await db.ref(`contacts/${contactId}/${currentUser.id}`).remove();
+            }
+            await contactsRef.remove();
+        }
+        
+        // Удаляем объявления
+        const adsSnap = await db.ref('ads').orderByChild('userId').equalTo(currentUser.id).once('value');
+        if (adsSnap.exists()) {
+            for (const adId of Object.keys(adsSnap.val())) {
+                await db.ref(`ads/${adId}`).remove();
+            }
+        }
+        
+        // Удаляем блокировки
+        const blockedSnap = await db.ref(`blocked/${currentUser.id}`).once('value');
+        if (blockedSnap.exists()) {
+            for (const blockedId of Object.keys(blockedSnap.val())) {
+                await db.ref(`blocked/${blockedId}/${currentUser.id}`).remove();
+            }
+            await db.ref(`blocked/${currentUser.id}`).remove();
+        }
+        
+        // Удаляем пользователя
+        await db.ref(`users/${currentUser.id}`).remove();
+        
+        showToast('Аккаунт удалён');
+        logout();
+    }
+    
+    // ========== БЛОКИРОВКА ==========
+    async function loadBlockedUsers() {
+        const snapshot = await db.ref(`blocked/${currentUser.id}`).once('value');
+        blockedUsers = [];
+        if (snapshot.exists()) {
+            blockedUsers = Object.keys(snapshot.val());
+        }
+    }
+    
+    async function toggleBlockUser() {
+        if (!currentChat) return;
+        
+        const isBlocked = blockedUsers.includes(currentChat.id);
+        
+        if (isBlocked) {
+            await db.ref(`blocked/${currentUser.id}/${currentChat.id}`).remove();
+            await db.ref(`blocked/${currentChat.id}/${currentUser.id}`).remove();
+            showToast(`✅ ${currentChat.name} разблокирован`);
+            document.getElementById('blockUserBtn').style.background = 'linear-gradient(135deg, #667eea, #764ba2)';
+        } else {
+            await db.ref(`blocked/${currentUser.id}/${currentChat.id}`).set(true);
+            await db.ref(`blocked/${currentChat.id}/${currentUser.id}`).set(true);
+            showToast(`🔒 ${currentChat.name} заблокирован`);
+            document.getElementById('blockUserBtn').style.background = '#dc3545';
+        }
+        await loadBlockedUsers();
+    }
+    
+    function isBlocked(userId) {
+        return blockedUsers.includes(userId);
+    }
+    
     // ========== ПРОФИЛЬ ==========
     function showProfileModal() {
         document.getElementById('profileName').value = currentUser.name || currentUser.login;
-        document.getElementById('profileAvatar').textContent = currentUser.avatar || '😎';
+        const avatarDiv = document.getElementById('profileAvatar');
+        if (currentUser.avatarUrl) {
+            avatarDiv.innerHTML = `<img src="${currentUser.avatarUrl}" class="profile-avatar-img">`;
+        } else {
+            avatarDiv.innerHTML = currentUser.avatar || '😎';
+        }
         openModal('profileModal');
     }
     
@@ -859,7 +991,9 @@
     
     function selectAvatar(avatar) {
         currentUser.avatar = avatar;
-        document.getElementById('profileAvatar').textContent = avatar;
+        currentUser.avatarUrl = '';
+        const avatarDiv = document.getElementById('profileAvatar');
+        avatarDiv.innerHTML = avatar;
         closeModal('avatarModal');
         openModal('profileModal');
     }
@@ -1119,6 +1253,16 @@
         renderContacts();
     }
     
+    async function deleteContact(contactId, event) {
+        event.stopPropagation();
+        if (!confirm('Удалить контакт?')) return;
+        
+        await db.ref(`contacts/${currentUser.id}/${contactId}`).remove();
+        showToast('Контакт удалён');
+        await loadContacts();
+        await loadChats();
+    }
+    
     function setupMessageListener() {
         if (!currentUser) return;
         
@@ -1135,7 +1279,7 @@
             const msgs = snap.val();
             const lastMsg = Object.values(msgs).sort((a,b) => b.timestamp - a.timestamp)[0];
             
-            if (lastMsg && lastMsg.from !== currentUser.id && contact) {
+            if (lastMsg && lastMsg.from !== currentUser.id && contact && !isBlocked(contactId)) {
                 const isChatOpen = (currentChat && currentChat.id === contactId);
                 if (!isChatOpen) {
                     showNotification(contact.name, lastMsg.content?.substring(0, 100) || '📎 Файл или 🎤 Аудио');
@@ -1145,7 +1289,7 @@
             }
             
             loadChats();
-            if (currentChat && contactId === currentChat.id) {
+            if (currentChat && contactId === currentChat.id && !isBlocked(contactId)) {
                 loadMessages();
             }
         });
@@ -1161,6 +1305,12 @@
         let contactId;
         snapshot.forEach(child => contactId = child.key);
         if (contactId === currentUser.id) return showToast('Нельзя добавить себя');
+        
+        // Проверяем не заблокирован ли
+        if (isBlocked(contactId)) {
+            return showToast('Этот пользователь заблокирован');
+        }
+        
         await db.ref(`contacts/${currentUser.id}/${contactId}`).set({ name: login, added_at: Date.now() });
         showToast('Контакт добавлен');
         closeModal('addContactModal');
@@ -1170,28 +1320,38 @@
     
     function renderContacts() {
         const search = document.getElementById('contactSearch')?.value?.toLowerCase() || '';
-        const filtered = contacts.filter(c => c.name.toLowerCase().includes(search));
+        const filtered = contacts.filter(c => c.name.toLowerCase().includes(search) && !isBlocked(c.id));
         document.getElementById('contactsList').innerHTML = filtered.map(c => `
             <div class="contact-item" onclick='openChat(${JSON.stringify(c).replace(/"/g, '&quot;')})'>
                 <div class="contact-avatar">${c.avatar}<span class="online-indicator"></span></div>
-                <div><b>${escapeHtml(c.name)}</b><br><small>@${c.login}</small></div>
+                <div style="flex:1">
+                    <b>${escapeHtml(c.name)}</b><br>
+                    <small>@${c.login}</small>
+                </div>
+                <div class="contact-actions">
+                    <button class="delete-contact" onclick="deleteContact('${c.id}', event)">🗑️</button>
+                </div>
             </div>
         `).join('');
     }
     
     // ========== ЧАТЫ ==========
     async function loadChats() {
+        await loadBlockedUsers();
+        
         const snapshot = await db.ref(`messages/${currentUser.id}`).once('value');
         chats = [];
         if (snapshot.exists()) {
             for (const [contactId, msgs] of Object.entries(snapshot.val())) {
                 const contact = contacts.find(c => c.id === contactId);
-                if (contact) {
+                if (contact && !isBlocked(contactId)) {
                     const lastMsg = Object.values(msgs).sort((a,b) => b.timestamp - a.timestamp)[0];
                     chats.push({ contact, lastMsg });
                 }
             }
         }
+        // Сортировка по последнему сообщению (свежие сверху)
+        chats.sort((a,b) => b.lastMsg.timestamp - a.lastMsg.timestamp);
         renderChats();
     }
     
@@ -1203,7 +1363,7 @@
                 <div class="contact-avatar">${c.contact.avatar}<span class="online-indicator"></span></div>
                 <div style="flex:1">
                     <b>${escapeHtml(c.contact.name)}</b><br>
-                    <small>${c.lastMsg.type === 'text' ? (c.lastMsg.content || '').substring(0,30) : (c.lastMsg.type === 'audio' ? '🎤 Аудио' : '📎 Файл')}</small>
+                    <small>${c.lastMsg.type === 'text' ? (c.lastMsg.content || '').substring(0,30) : (c.lastMsg.type === 'audio' ? '🎤 Аудио' : (c.lastMsg.type === 'file' ? '📎 Файл' : (c.lastMsg.type === 'photo' ? '🖼️ Фото' : '📎 Вложение')))}</small>
                 </div>
                 <small>${new Date(c.lastMsg.timestamp).toLocaleTimeString()}</small>
             </div>
@@ -1213,9 +1373,24 @@
     function openChat(contact) {
         if (!contact) return;
         
+        if (isBlocked(contact.id)) {
+            showToast(`🔒 ${contact.name} заблокирован. Разблокируйте в чате.`);
+            return;
+        }
+        
         currentChat = contact;
         document.getElementById('chatName').innerText = contact.name;
         document.getElementById('chatLogin').innerText = '@' + contact.login;
+        
+        // Обновляем кнопку блокировки
+        const isBlockedUser = blockedUsers.includes(contact.id);
+        const blockBtn = document.getElementById('blockUserBtn');
+        if (isBlockedUser) {
+            blockBtn.style.background = '#dc3545';
+        } else {
+            blockBtn.style.background = 'linear-gradient(135deg, #667eea, #764ba2)';
+        }
+        
         document.getElementById('chatContainer').classList.add('active');
         
         if (window.chatListenerRef) {
@@ -1224,7 +1399,9 @@
         
         window.chatListenerRef = db.ref(`messages/${currentUser.id}/${contact.id}`);
         window.chatListenerRef.on('child_added', () => {
-            loadMessages();
+            if (!isBlocked(contact.id)) {
+                loadMessages();
+            }
         });
         
         loadMessages().then(() => {
@@ -1243,8 +1420,17 @@
         console.log('✅ Чат закрыт');
     }
     
+    function formatMessageContent(msg) {
+        if (msg.type === 'text') return escapeHtml(msg.content);
+        if (msg.type === 'audio') return `<audio controls src="${msg.content}" class="audio-player"></audio>`;
+        if (msg.type === 'photo') return `<img src="${msg.content}" class="message-image" onclick="window.open('${msg.content}','_blank')">`;
+        if (msg.type === 'video') return `<video controls src="${msg.content}" class="message-video"></video>`;
+        if (msg.type === 'file') return `<a href="${msg.content}" download="${msg.name}" class="message-file">📎 ${escapeHtml(msg.name)}</a>`;
+        return msg.content;
+    }
+    
     async function loadMessages() {
-        if (!currentChat) return;
+        if (!currentChat || isBlocked(currentChat.id)) return;
         
         const snapshot = await db.ref(`messages/${currentUser.id}/${currentChat.id}`).orderByKey().limitToLast(50).once('value');
         const messages = [];
@@ -1258,11 +1444,7 @@
             } else {
                 container.innerHTML = messages.map(msg => `
                     <div class="message ${msg.from === currentUser.id ? 'out' : 'in'}">
-                        <div>${msg.type === 'text' ? escapeHtml(msg.content) : 
-                             msg.type === 'audio' ? `<audio controls src="${msg.content}" class="audio-player"></audio>` : 
-                             msg.type === 'file' ? `<a href="${msg.content}" download="${msg.name}" style="color:white;">📎 ${msg.name}</a>` : 
-                             msg.type === 'photo' ? `<img src="${msg.content}" style="max-width:200px; border-radius:12px;">` : 
-                             msg.content}</div>
+                        <div>${formatMessageContent(msg)}</div>
                         <div class="message-meta">${msg.from === currentUser.id ? 'Вы' : currentChat.name} • ${new Date(msg.timestamp).toLocaleTimeString()}</div>
                     </div>
                 `).join('');
@@ -1271,8 +1453,13 @@
     }
     
     async function sendMessage() {
+        if (!currentChat || isBlocked(currentChat.id)) {
+            showToast('Нельзя отправить сообщение заблокированному пользователю');
+            return;
+        }
+        
         const text = document.getElementById('messageInput').value.trim();
-        if (!text || !currentChat) return;
+        if (!text) return;
         
         const msgId = Date.now().toString();
         const msgData = {
@@ -1297,20 +1484,43 @@
         document.getElementById('fileInput').click();
     }
     
+    function detectFileType(filename, mimeType) {
+        if (mimeType && mimeType.startsWith('image/')) return 'photo';
+        if (mimeType && mimeType.startsWith('video/')) return 'video';
+        return 'file';
+    }
+    
     document.getElementById('fileInput').onchange = async (e) => {
         const file = e.target.files[0];
-        if (!file || !currentChat) return;
+        if (!file || !currentChat || isBlocked(currentChat.id)) {
+            if (isBlocked(currentChat?.id)) showToast('Нельзя отправить файл заблокированному пользователю');
+            return;
+        }
+        
+        const fileType = detectFileType(file.name, file.type);
         const reader = new FileReader();
+        
         reader.onload = async (ev) => {
             const msgId = Date.now().toString();
-            const msgData = { from: currentUser.id, to: currentChat.id, type: 'file', name: file.name, content: ev.target.result, timestamp: Date.now() };
+            const msgData = {
+                from: currentUser.id,
+                to: currentChat.id,
+                type: fileType,
+                name: file.name,
+                content: ev.target.result,
+                timestamp: Date.now()
+            };
+            
             await db.ref(`messages/${currentChat.id}/${currentUser.id}/${msgId}`).set(msgData);
             await db.ref(`messages/${currentUser.id}/${currentChat.id}/${msgId}`).set(msgData);
             await loadMessages();
+            
             const container = document.getElementById('messages');
             if (container) container.scrollTop = container.scrollHeight;
         };
+        
         reader.readAsDataURL(file);
+        document.getElementById('fileInput').value = '';
     };
     
     async function toggleRecording() {
@@ -1327,6 +1537,7 @@
                     const blob = new Blob(chunks, { type: 'audio/webm' });
                     const reader = new FileReader();
                     reader.onload = async () => {
+                        if (!currentChat || isBlocked(currentChat.id)) return;
                         const msgId = Date.now().toString();
                         const msgData = { from: currentUser.id, to: currentChat.id, type: 'audio', content: reader.result, timestamp: Date.now() };
                         await db.ref(`messages/${currentChat.id}/${currentUser.id}/${msgId}`).set(msgData);
@@ -1348,6 +1559,10 @@
     
     function startCall() {
         if (!currentChat) return;
+        if (isBlocked(currentChat.id)) {
+            showToast('Нельзя позвонить заблокированному пользователю');
+            return;
+        }
         showToast(`📞 Звонок ${currentChat.name}... (WebRTC в разработке)`);
         console.log('📞 Звонок:', currentChat.name);
     }
@@ -1361,6 +1576,7 @@
     
     async function loadData() {
         if (!currentUser) return;
+        await loadBlockedUsers();
         await loadContacts();
         await loadChats();
         await loadAds();
