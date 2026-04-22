@@ -1276,10 +1276,6 @@
         const text = document.getElementById('messageInput').value.trim();
         if (!text || !currentChat) return;
         
-        console.log('🔵 [TRACE] sendMessage вызвана');
-        console.log('🔵 [TRACE] Текст:', text);
-        console.log('🔵 [TRACE] currentChat:', currentChat.id, currentChat.name);
-        
         const msgId = Date.now().toString();
         const msgData = {
             from: currentUser.id,
@@ -1288,27 +1284,16 @@
             content: text,
             timestamp: Date.now()
         };
-        console.log('🔵 [TRACE] Данные сообщения:', msgData);
         
-        console.log('🔵 [TRACE] Запись в БД для получателя...');
         await db.ref(`messages/${currentChat.id}/${currentUser.id}/${msgId}`).set(msgData);
-        console.log('🔵 [TRACE] Запись в БД для отправителя...');
         await db.ref(`messages/${currentUser.id}/${currentChat.id}/${msgId}`).set(msgData);
         
-        console.log('🔵 [TRACE] Проверка записи...');
-        const check = await db.ref(`messages/${currentUser.id}/${currentChat.id}/${msgId}`).once('value');
-        if (check.exists()) {
-            console.log('🟢 [TRACE] Сообщение УСПЕШНО записано в БД');
-            console.log('🟢 [TRACE] Данные в БД:', check.val());
-        } else {
-            console.log('🔴 [TRACE] ОШИБКА: Сообщение НЕ записалось в БД');
-        }
-        
         document.getElementById('messageInput').value = '';
-        
-        console.log('🔵 [TRACE] Вызов loadMessages...');
         await loadMessages();
-        console.log('🟢 [TRACE] Отправка завершена');
+        
+        // Скролл вниз после отправки
+        const container = document.getElementById('messages');
+        if (container) container.scrollTop = container.scrollHeight;
     }
     
     function selectFile() { document.getElementById('fileInput').click(); }
@@ -1323,7 +1308,10 @@
             await db.ref(`messages/${currentChat.id}/${currentUser.id}/${msgId}`).set(msgData);
             await db.ref(`messages/${currentUser.id}/${currentChat.id}/${msgId}`).set(msgData);
             await loadMessages();
-            console.log('✅ Файл отправлен:', file.name);
+            
+            // Скролл вниз после отправки
+            const container = document.getElementById('messages');
+            if (container) container.scrollTop = container.scrollHeight;
         };
         reader.readAsDataURL(file);
     };
@@ -1347,7 +1335,10 @@
                         await db.ref(`messages/${currentChat.id}/${currentUser.id}/${msgId}`).set(msgData);
                         await db.ref(`messages/${currentUser.id}/${currentChat.id}/${msgId}`).set(msgData);
                         await loadMessages();
-                        console.log('✅ Аудио отправлено');
+                        
+                        // Скролл вниз после отправки
+                        const container = document.getElementById('messages');
+                        if (container) container.scrollTop = container.scrollHeight;
                     };
                     reader.readAsDataURL(blob);
                     stream.getTracks().forEach(t => t.stop());
@@ -1355,7 +1346,7 @@
                 mediaRecorder.start();
                 document.getElementById('recordBtn').style.background = '#dc3545';
                 setTimeout(() => { if (mediaRecorder?.state === 'recording') toggleRecording(); }, 30000);
-            } catch(e) { showToast('Нет доступа к микрофону'); console.log('❌ Микрофон ошибка:', e); }
+            } catch(e) { showToast('Нет доступа к микрофону'); }
         }
     }
     
