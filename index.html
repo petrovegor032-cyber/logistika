@@ -1164,11 +1164,16 @@
             timestamp: Date.now()
         };
         
-        await db.ref(`messages/${currentChat.id}/${currentUser.id}/${msgId}`).set(msgData);
-        await db.ref(`messages/${currentUser.id}/${currentChat.id}/${msgId}`).set(msgData);
-        
-        document.getElementById('messageInput').value = '';
-        await loadMessages();
+        try {
+            await db.ref(`messages/${currentChat.id}/${currentUser.id}/${msgId}`).set(msgData);
+            await db.ref(`messages/${currentUser.id}/${currentChat.id}/${msgId}`).set(msgData);
+            
+            document.getElementById('messageInput').value = '';
+            await loadMessages();
+            console.log('✅ Сообщение отправлено:', text);
+        } catch(e) {
+            console.error('❌ Ошибка отправки:', e);
+        }
     }
     
     function selectFile() { document.getElementById('fileInput').click(); }
