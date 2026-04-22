@@ -1296,6 +1296,8 @@
         }
     }
     
+// ========== ТВОЙ РАБОЧИЙ КОД С ТРАССИРОВКОЙ ==========
+    
     async function sendMessage() {
         const text = document.getElementById('messageInput').value.trim();
         if (!text || !currentChat) return;
@@ -1332,33 +1334,48 @@
         
         console.log('🔵 [TRACE] Вызов loadMessages...');
         await loadMessages();
-        
-        // Скролл вниз только при отправке
-        const container = document.getElementById('messages');
-        if (container) container.scrollTop = container.scrollHeight;
-        
-        console.log('🟢 [TRACE] Отправка завершена, скролл вниз');
+        console.log('🟢 [TRACE] Отправка завершена');
     }
     
-    function selectFile() { document.getElementById('fileInput').click(); }
-    
-    document.getElementById('fileInput').onchange = async (e) => {
-        const file = e.target.files[0];
-        if (!file || !currentChat) return;
-        const reader = new FileReader();
-        reader.onload = async (ev) => {
-            const msgId = Date.now().toString();
-            const msgData = { from: currentUser.id, to: currentChat.id, type: 'file', name: file.name, content: ev.target.result, timestamp: Date.now() };
-            await db.ref(`messages/${currentChat.id}/${currentUser.id}/${msgId}`).set(msgData);
-            await db.ref(`messages/${currentUser.id}/${currentChat.id}/${msgId}`).set(msgData);
-            await loadMessages();
-            
-            // Скролл вниз после отправки
-            const container = document.getElementById('messages');
-            if (container) container.scrollTop = container.scrollHeight;
-        };
-        reader.readAsDataURL(file);
-    };
+    async function loadMessages() {
+        if (!currentChat) return;
+        
+        console.log('🔵 [TRACE] loadMessages вызвана');
+        console.log('🔵 [TRACE] currentChat:', currentChat.id, currentChat.name);
+        
+        const path = `messages/${currentUser.id}/${currentChat.id}`;
+        console.log('🔵 [TRACE] Путь в БД:', path);
+        
+        const snapshot = await db.ref(path).orderByKey().limitToLast(50).once('value');
+        console.log('🔵 [TRACE] snapshot.exists():', snapshot.exists());
+        console.log('🔵 [TRACE] snapshot.numChildren():', snapshot.numChildren());
+        
+        const messages = [];
+        snapshot.forEach(child => {
+            console.log('🔵 [TRACE] Найдено сообщение:', child.key, child.val());
+            messages.push(child.val());
+        });
+        messages.sort((a,b) => a.timestamp - b.timestamp);
+        console.log('🔵 [TRACE] Всего сообщений:', messages.length);
+        
+        const container = document.getElementById('messages');
+        console.log('🔵 [TRACE] Контейнер messages найден:', !!container);
+        
+        if (container) {
+            const html = messages.map(msg => `
+                <div class="message ${msg.from === currentUser.id ? 'out' : 'in'}">
+                    <div>${msg.type === 'text' ? escapeHtml(msg.content) : 
+                         msg.type === 'audio' ? `<audio controls src="${msg.content}"></audio>` : 
+                         msg.type === 'file' ? `<a href="${msg.content}" download="${msg.name}">📎 ${msg.name}</a>` : 
+                         msg.content}</div>
+                    <div class="message-meta">${msg.from === currentUser.id ? 'Вы' : currentChat.name} • ${new Date(msg.timestamp).toLocaleTimeString()}</div>
+                </div>
+            `).join('');
+            console.log('🔵 [TRACE] HTML длина:', html.length);
+            container.innerHTML = html;
+            console.log('🟢 [TRACE] Сообщения отображены');
+        }
+    }
     
     async function toggleRecording() {
         if (mediaRecorder && mediaRecorder.state === 'recording') {
@@ -1379,10 +1396,7 @@
                         await db.ref(`messages/${currentChat.id}/${currentUser.id}/${msgId}`).set(msgData);
                         await db.ref(`messages/${currentUser.id}/${currentChat.id}/${msgId}`).set(msgData);
                         await loadMessages();
-                        
-                        // Скролл вниз после отправки
-                        const container = document.getElementById('messages');
-                        if (container) container.scrollTop = container.scrollHeight;
+                        console.log('✅ Аудио отправлено');
                     };
                     reader.readAsDataURL(blob);
                     stream.getTracks().forEach(t => t.stop());
@@ -1390,7 +1404,7 @@
                 mediaRecorder.start();
                 document.getElementById('recordBtn').style.background = '#dc3545';
                 setTimeout(() => { if (mediaRecorder?.state === 'recording') toggleRecording(); }, 30000);
-            } catch(e) { showToast('Нет доступа к микрофону'); }
+            } catch(e) { showToast('Нет доступа к микрофону'); console.log('❌ Микрофон ошибка:', e); }
         }
     }
     
