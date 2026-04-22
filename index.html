@@ -1571,30 +1571,51 @@
     }
     
     async function startCall() {
-        if (!currentChat) return showToast('Откройте чат с контактом');
-        if (callActive) return showToast('Звонок уже активен');
+        if (!currentChat) {
+            showToast('Откройте чат с контактом');
+            return;
+        }
+        
+        if (callActive) {
+            showToast('Звонок уже активен');
+            return;
+        }
+        
+        // Проверка наличия кнопок
+        const callBtn = document.getElementById('callBtn');
+        const endCallBtn = document.getElementById('endCallBtn');
+        
+        console.log('📞 Начинаем звонок:', currentChat.name);
+        showToast(`📞 Звонок ${currentChat.name}...`);
         
         try {
             localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
             
             peerConnection = new RTCPeerConnection({
-                iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }]
+                iceServers: [
+                    { urls: 'stun:stun.l.google.com:19302' },
+                    { urls: 'stun:stun1.l.google.com:19302' }
+                ]
             });
             
-            localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+            localStream.getTracks().forEach(track => {
+                peerConnection.addTrack(track, localStream);
+            });
             
             peerConnection.ontrack = (event) => {
+                console.log('📡 Получен поток от собеседника');
                 const audio = new Audio();
                 audio.srcObject = event.streams[0];
-                audio.play();
-                callActive = true;
-                document.getElementById('callBtn').style.display = 'none';
-                document.getElementById('endCallBtn').style.display = 'flex';
+                audio.play().catch(e => console.log('Автовоспроизведение:', e));
                 showToast('🔊 Соединение установлено');
+                callActive = true;
+                if (callBtn) callBtn.style.display = 'none';
+                if (endCallBtn) endCallBtn.style.display = 'flex';
             };
             
             peerConnection.onicecandidate = (event) => {
                 if (event.candidate) {
+                    console.log('🧊 ICE кандидат:', event.candidate.type);
                     db.ref(`calls/${currentChat.id}/candidates`).push({
                         candidate: {
                             candidate: event.candidate.candidate,
@@ -1608,7 +1629,10 @@
             };
             
             peerConnection.onconnectionstatechange = () => {
-                if (peerConnection.connectionState === 'disconnected' || peerConnection.connectionState === 'failed') {
+                console.log('🔗 Состояние:', peerConnection.connectionState);
+                if (peerConnection.connectionState === 'connected') {
+                    showToast('✅ Звонок установлен');
+                } else if (peerConnection.connectionState === 'disconnected' || peerConnection.connectionState === 'failed') {
                     endCall();
                 }
             };
@@ -1622,14 +1646,17 @@
                 timestamp: Date.now()
             });
             
-            document.getElementById('callBtn').style.display = 'none';
-            document.getElementById('endCallBtn').style.display = 'flex';
+            if (callBtn) callBtn.style.display = 'none';
+            if (endCallBtn) endCallBtn.style.display = 'flex';
             
             const answerRef = db.ref(`calls/${currentUser.id}/answer`);
             const answerSnap = await answerRef.once('value');
             if (answerSnap.exists()) {
                 const answerData = answerSnap.val();
-                const answer = new RTCSessionDescription({ type: answerData.answer.type, sdp: answerData.answer.sdp });
+                const answer = new RTCSessionDescription({
+                    type: answerData.answer.type,
+                    sdp: answerData.answer.sdp
+                });
                 await peerConnection.setRemoteDescription(answer);
                 await answerRef.remove();
                 callActive = true;
@@ -1648,29 +1675,39 @@
             });
             
         } catch(e) {
-            console.error('Ошибка звонка:', e);
+            console.error('❌ Ошибка звонка:', e);
             showToast('❌ Не удалось начать звонок');
             endCall();
         }
     }
     
     async function acceptCall(fromUserId, offer) {
+        console.log('📞 Принимаем звонок от:', fromUserId);
+        
+        const callBtn = document.getElementById('callBtn');
+        const endCallBtn = document.getElementById('endCallBtn');
+        
         try {
             localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
             
             peerConnection = new RTCPeerConnection({
-                iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }]
+                iceServers: [
+                    { urls: 'stun:stun.l.google.com:19302' },
+                    { urls: 'stun:stun1.l.google.com:19302' }
+                ]
             });
             
-            localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+            localStream.getTracks().forEach(track => {
+                peerConnection.addTrack(track, localStream);
+            });
             
             peerConnection.ontrack = (event) => {
                 const audio = new Audio();
                 audio.srcObject = event.streams[0];
                 audio.play();
                 callActive = true;
-                document.getElementById('callBtn').style.display = 'none';
-                document.getElementById('endCallBtn').style.display = 'flex';
+                if (callBtn) callBtn.style.display = 'none';
+                if (endCallBtn) endCallBtn.style.display = 'flex';
                 showToast('🔊 Звонок начался');
             };
             
@@ -1694,7 +1731,11 @@
                 }
             };
             
-            await peerConnection.setRemoteDescription(new RTCSessionDescription({ type: offer.type, sdp: offer.sdp }));
+            await peerConnection.setRemoteDescription(new RTCSessionDescription({
+                type: offer.type,
+                sdp: offer.sdp
+            }));
+            
             const answer = await peerConnection.createAnswer();
             await peerConnection.setLocalDescription(answer);
             
@@ -1705,16 +1746,19 @@
             });
             
             callActive = true;
-            document.getElementById('callBtn').style.display = 'none';
-            document.getElementById('endCallBtn').style.display = 'flex';
+            if (callBtn) callBtn.style.display = 'none';
+            if (endCallBtn) endCallBtn.style.display = 'flex';
             
         } catch(e) {
-            console.error('Ошибка принятия звонка:', e);
+            console.error('❌ Ошибка принятия звонка:', e);
             endCall();
         }
     }
     
     function endCall() {
+        const callBtn = document.getElementById('callBtn');
+        const endCallBtn = document.getElementById('endCallBtn');
+        
         if (peerConnection) {
             peerConnection.close();
             peerConnection = null;
@@ -1724,8 +1768,11 @@
             localStream = null;
         }
         callActive = false;
-        document.getElementById('callBtn').style.display = 'flex';
-        document.getElementById('endCallBtn').style.display = 'none';
+        
+        if (callBtn) callBtn.style.display = 'flex';
+        if (endCallBtn) endCallBtn.style.display = 'none';
+        
+        console.log('📞 Звонок завершен');
         showToast('📞 Звонок завершен');
     }
     
