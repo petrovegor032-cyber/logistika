@@ -1058,6 +1058,10 @@
         window.globalListenerRef = messagesRef;
         messagesRef.on('child_added', () => {
             loadChats();
+            // Если чат открыт с тем же контактом, обновляем сообщения
+            if (currentChat) {
+                loadMessages();
+            }
         });
         
         console.log('✅ Глобальный слушатель сообщений установлен');
