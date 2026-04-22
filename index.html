@@ -680,6 +680,39 @@
         document.body.appendChild(toast);
         setTimeout(() => toast.remove(), 2000);
     }
+
+    function showToast(msg) {
+        const toast = document.createElement('div');
+        toast.className = 'toast';
+        toast.textContent = msg;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 2000);
+    }
+
+    // ========== УВЕДОМЛЕНИЯ ==========
+    function requestNotificationPermission() {
+        if ('Notification' in window) {
+            Notification.requestPermission().then(permission => {
+                console.log('🔔 Разрешение на уведомления:', permission);
+            });
+        }
+    }
+    
+    function showNotification(title, body) {
+        if (!('Notification' in window)) return;
+        if (Notification.permission !== 'granted') return;
+        
+        if (document.hidden) {
+            new Notification(title, {
+                body: body,
+                icon: 'https://petrovegor032-cyber.github.io/logistika/favicon.ico',
+                tag: 'message',
+                vibrate: [200, 100, 200]
+            });
+        } else {
+            showToast(`📨 ${title}: ${body.substring(0, 50)}`);
+        }
+    }
     
     // ========== МЕНЮ ==========
     function toggleMenu() {
@@ -750,6 +783,7 @@
             initMap();
             loadData();
             setupMessageListener();
+            requestNotificationPermission();  // ← ДОБАВИТЬ ЭТУ СТРОКУ
         } else {
             openModal('authModal');
         }
@@ -1046,14 +1080,30 @@
             window.globalListenerRef.off();
         }
         window.globalListenerRef = messagesRef;
-        messagesRef.on('child_added', () => {
+        
+        messagesRef.on('child_added', async (snap) => {
+            const contactId = snap.key;
+            const contact = contacts.find(c => c.id === contactId);
+            
+            const msgs = snap.val();
+            const lastMsg = Object.values(msgs).sort((a,b) => b.timestamp - a.timestamp)[0];
+            
+            if (lastMsg && lastMsg.from !== currentUser.id && contact) {
+                const isChatOpen = (currentChat && currentChat.id === contactId);
+                if (!isChatOpen) {
+                    showNotification(contact.name, lastMsg.content?.substring(0, 100) || '📎 Файл или 🎤 Аудио');
+                } else {
+                    showToast(`📨 ${contact.name}: ${lastMsg.content?.substring(0, 50) || 'Файл или аудио'}`);
+                }
+            }
+            
             loadChats();
-            if (currentChat) {
+            if (currentChat && contactId === currentChat.id) {
                 loadMessages();
             }
         });
         
-        console.log('✅ Глобальный слушатель сообщений установлен');
+        console.log('✅ Глобальный слушатель сообщений с уведомлениями установлен');
     }
   
     async function addContact() {
