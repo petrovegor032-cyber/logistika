@@ -613,64 +613,95 @@
     function initSparks() {
         const canvas = document.getElementById('sparks-canvas');
         const ctx = canvas.getContext('2d');
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
+        
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
         
         const sparks = [];
-        const colors = ['#ff0', '#f0f', '#0ff', '#ff6600', '#ff0066', '#66ff00'];
+        const colors = ['#ff0', '#f0f', '#0ff', '#ff6600', '#ff0066', '#66ff00', '#fff', '#ffcc00'];
         
         function createSpark() {
             return {
                 x: Math.random() * canvas.width,
                 y: Math.random() * canvas.height,
-                radius: 3 + Math.random() * 5,
+                radius: 2 + Math.random() * 4,
                 alpha: 0,
                 color: colors[Math.floor(Math.random() * colors.length)],
                 life: 0,
-                maxLife: 30 + Math.random() * 60
+                maxLife: 40 + Math.random() * 80,
+                // Скорость появления и исчезновения
+                fadeInSpeed: 0.03 + Math.random() * 0.05,
+                fadeOutSpeed: 0.02 + Math.random() * 0.03
             };
         }
         
-        for (let i = 0; i < 30; i++) {
+        // Создаем 15 искр (редко)
+        for (let i = 0; i < 15; i++) {
             sparks.push(createSpark());
+            // Случайная задержка начала жизни
+            sparks[i].life = -Math.random() * sparks[i].maxLife;
         }
+        
+        let lastSpawnTime = Date.now();
         
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
-            for (const spark of sparks) {
+            const now = Date.now();
+            
+            // Редко добавляем новую искру (раз в 2-5 секунд)
+            if (sparks.length < 20 && now - lastSpawnTime > 2000 + Math.random() * 3000) {
+                sparks.push(createSpark());
+                lastSpawnTime = now;
+            }
+            
+            for (let i = 0; i < sparks.length; i++) {
+                const spark = sparks[i];
+                
                 if (spark.life < spark.maxLife) {
                     spark.life++;
-                    let alphaValue = Math.sin(Math.PI * spark.life / spark.maxLife);
-                    if (alphaValue < 0) alphaValue = 0;
-                    spark.alpha = alphaValue;
+                    
+                    // Плавное изменение прозрачности (синусоида)
+                    const progress = spark.life / spark.maxLife;
+                    // Нарастание и затухание
+                    let alpha = Math.sin(Math.PI * progress);
+                    // Добавляем случайное мерцание
+                    alpha = alpha * (0.7 + Math.random() * 0.5);
+                    spark.alpha = Math.min(0.9, Math.max(0, alpha));
+                    
+                    // Размер тоже пульсирует
+                    const pulseRadius = spark.radius * (0.8 + Math.sin(progress * Math.PI * 2) * 0.3);
+                    
+                    if (spark.alpha > 0.05) {
+                        ctx.beginPath();
+                        ctx.arc(spark.x, spark.y, pulseRadius, 0, Math.PI * 2);
+                        ctx.fillStyle = spark.color;
+                        ctx.shadowBlur = 12;
+                        ctx.shadowColor = spark.color;
+                        ctx.globalAlpha = spark.alpha;
+                        ctx.fill();
+                    }
                 } else {
+                    // Искра умерла — создаем новую в случайном месте
                     spark.life = 0;
                     spark.x = Math.random() * canvas.width;
                     spark.y = Math.random() * canvas.height;
+                    spark.radius = 2 + Math.random() * 4;
                     spark.color = colors[Math.floor(Math.random() * colors.length)];
-                    spark.radius = 3 + Math.random() * 5;
-                }
-                
-                const currentRadius = spark.radius * spark.alpha;
-                if (currentRadius > 0) {
-                    ctx.beginPath();
-                    ctx.arc(spark.x, spark.y, currentRadius, 0, Math.PI * 2);
-                    ctx.fillStyle = spark.color;
-                    ctx.shadowBlur = 10;
-                    ctx.shadowColor = spark.color;
-                    ctx.fill();
+                    spark.maxLife = 40 + Math.random() * 80;
                 }
             }
             
+            ctx.globalAlpha = 1;
+            ctx.shadowBlur = 0;
             requestAnimationFrame(draw);
         }
         
         draw();
-        window.addEventListener('resize', () => {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-        });
     }
     
     function showToast(msg) {
