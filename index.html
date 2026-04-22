@@ -1039,14 +1039,17 @@
     function setupMessageListener() {
         if (!currentUser) return;
         
+        // Слушатель для обновления списка чатов при новых сообщениях
         const messagesRef = db.ref(`messages/${currentUser.id}`);
-        messagesRef.off();
-        messagesRef.on('child_added', (snap) => {
-            if (currentChat && snap.key === currentChat.id) {
-                loadMessages();
-            }
+        if (window.globalListenerRef) {
+            window.globalListenerRef.off();
+        }
+        window.globalListenerRef = messagesRef;
+        messagesRef.on('child_added', () => {
             loadChats();
         });
+        
+        console.log('✅ Глобальный слушатель сообщений установлен');
     }
   
     async function addContact() {
