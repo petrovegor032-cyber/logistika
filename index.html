@@ -621,78 +621,81 @@
         resizeCanvas();
         window.addEventListener('resize', resizeCanvas);
         
-        const sparks = [];
+        let sparks = [];
         const colors = ['#ff0', '#f0f', '#0ff', '#ff6600', '#ff0066', '#66ff00', '#fff', '#ffcc00'];
         
-        function createSpark() {
+        function createSpark(x, y) {
             return {
-                x: Math.random() * canvas.width,
-                y: Math.random() * canvas.height,
-                radius: 2 + Math.random() * 4,
+                x: x || Math.random() * canvas.width,
+                y: y || Math.random() * canvas.height,
+                radius: 3 + Math.random() * 6,
                 alpha: 0,
                 color: colors[Math.floor(Math.random() * colors.length)],
                 life: 0,
-                maxLife: 40 + Math.random() * 80,
-                // Скорость появления и исчезновения
-                fadeInSpeed: 0.03 + Math.random() * 0.05,
-                fadeOutSpeed: 0.02 + Math.random() * 0.03
+                maxLife: 60 + Math.random() * 100,
+                pulseSpeed: 0.05 + Math.random() * 0.1
             };
         }
         
-        // Создаем 15 искр (редко)
-        for (let i = 0; i < 15; i++) {
-            sparks.push(createSpark());
-            // Случайная задержка начала жизни
-            sparks[i].life = -Math.random() * sparks[i].maxLife;
-        }
+        // Начинаем с 0 искр
+        sparks = [];
         
-        let lastSpawnTime = Date.now();
+        let nextSpawnTimeout = null;
+        
+        function scheduleSpawn() {
+            // Случайная задержка от 8 до 25 секунд
+            const delay = (8000 + Math.random() * 17000);
+            
+            nextSpawnTimeout = setTimeout(() => {
+                // Количество новых искр: 1, 2 или 3
+                const count = 1 + Math.floor(Math.random() * 3);
+                
+                for (let i = 0; i < count; i++) {
+                    sparks.push(createSpark());
+                }
+                
+                console.log(`✨ Появилось ${count} искр(и)`);
+                
+                // Планируем следующее появление
+                scheduleSpawn();
+            }, delay);
+        }
         
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
-            const now = Date.now();
-            
-            // Редко добавляем новую искру (раз в 2-5 секунд)
-            if (sparks.length < 20 && now - lastSpawnTime > 2000 + Math.random() * 3000) {
-                sparks.push(createSpark());
-                lastSpawnTime = now;
-            }
-            
+            // Обновляем и рисуем искры
             for (let i = 0; i < sparks.length; i++) {
                 const spark = sparks[i];
                 
                 if (spark.life < spark.maxLife) {
                     spark.life++;
                     
-                    // Плавное изменение прозрачности (синусоида)
+                    // Плавное появление и исчезновение
                     const progress = spark.life / spark.maxLife;
-                    // Нарастание и затухание
                     let alpha = Math.sin(Math.PI * progress);
-                    // Добавляем случайное мерцание
-                    alpha = alpha * (0.7 + Math.random() * 0.5);
+                    // Мерцание в пике
+                    if (progress > 0.3 && progress < 0.7) {
+                        alpha = alpha * (0.6 + Math.random() * 0.5);
+                    }
                     spark.alpha = Math.min(0.9, Math.max(0, alpha));
                     
-                    // Размер тоже пульсирует
-                    const pulseRadius = spark.radius * (0.8 + Math.sin(progress * Math.PI * 2) * 0.3);
+                    // Пульсация размера
+                    const pulseRadius = spark.radius * (0.7 + Math.sin(progress * Math.PI * 2 * spark.pulseSpeed) * 0.3);
                     
                     if (spark.alpha > 0.05) {
                         ctx.beginPath();
                         ctx.arc(spark.x, spark.y, pulseRadius, 0, Math.PI * 2);
                         ctx.fillStyle = spark.color;
-                        ctx.shadowBlur = 12;
+                        ctx.shadowBlur = 15;
                         ctx.shadowColor = spark.color;
                         ctx.globalAlpha = spark.alpha;
                         ctx.fill();
                     }
                 } else {
-                    // Искра умерла — создаем новую в случайном месте
-                    spark.life = 0;
-                    spark.x = Math.random() * canvas.width;
-                    spark.y = Math.random() * canvas.height;
-                    spark.radius = 2 + Math.random() * 4;
-                    spark.color = colors[Math.floor(Math.random() * colors.length)];
-                    spark.maxLife = 40 + Math.random() * 80;
+                    // Искра исчезла — удаляем
+                    sparks.splice(i, 1);
+                    i--;
                 }
             }
             
@@ -701,6 +704,8 @@
             requestAnimationFrame(draw);
         }
         
+        // Запускаем
+        scheduleSpawn();
         draw();
     }
     
