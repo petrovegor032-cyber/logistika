@@ -1035,7 +1035,20 @@
         }
         renderContacts();
     }
-    
+
+    function setupMessageListener() {
+        if (!currentUser) return;
+        
+        const messagesRef = db.ref(`messages/${currentUser.id}`);
+        messagesRef.off();
+        messagesRef.on('child_added', (snap) => {
+            if (currentChat && snap.key === currentChat.id) {
+                loadMessages();
+            }
+            loadChats();
+        });
+    }
+  
     async function addContact() {
         const login = document.getElementById('contactLoginInput').value.trim();
         if (!login) return;
