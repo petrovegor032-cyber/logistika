@@ -1144,42 +1144,55 @@
         console.log('✅ Чат закрыт');
     }
     
+    // ========== ЧАТЫ (с трассировкой) ==========
+    
     async function loadMessages() {
         if (!currentChat) return;
         
-        try {
-            const snapshot = await db.ref(`messages/${currentUser.id}/${currentChat.id}`).orderByKey().limitToLast(50).once('value');
-            const messages = [];
-            snapshot.forEach(child => messages.push(child.val()));
-            messages.sort((a,b) => a.timestamp - b.timestamp);
-            
-            const container = document.getElementById('messages');
-            if (container) {
-                if (messages.length === 0) {
-                    container.innerHTML = '<div style="text-align:center; padding:40px;">💬 Нет сообщений</div>';
-                } else {
-                    container.innerHTML = messages.map(msg => `
-                        <div class="message ${msg.from === currentUser.id ? 'out' : 'in'}">
-                            <div>${msg.type === 'text' ? escapeHtml(msg.content) : 
-                                 msg.type === 'audio' ? `<audio controls src="${msg.content}" class="audio-player"></audio>` : 
-                                 msg.type === 'file' ? `<a href="${msg.content}" download="${msg.name}" style="color:white;">📎 ${msg.name}</a>` : 
-                                 msg.type === 'photo' ? `<img src="${msg.content}" style="max-width:200px; border-radius:12px;">` : 
-                                 msg.content}</div>
-                            <div class="message-meta">${msg.from === currentUser.id ? 'Вы' : currentChat.name} • ${new Date(msg.timestamp).toLocaleTimeString()}</div>
-                        </div>
-                    `).join('');
-                }
-                container.scrollTop = container.scrollHeight;
-            }
-            console.log('✅ Сообщения загружены, количество:', messages.length);
-        } catch(e) {
-            console.error('❌ Ошибка загрузки сообщений:', e);
+        console.log('🔵 [TRACE] loadMessages вызвана');
+        console.log('🔵 [TRACE] currentChat:', currentChat.id, currentChat.name);
+        
+        const path = `messages/${currentUser.id}/${currentChat.id}`;
+        console.log('🔵 [TRACE] Путь в БД:', path);
+        
+        const snapshot = await db.ref(path).orderByKey().limitToLast(50).once('value');
+        console.log('🔵 [TRACE] snapshot.exists():', snapshot.exists());
+        console.log('🔵 [TRACE] snapshot.numChildren():', snapshot.numChildren());
+        
+        const messages = [];
+        snapshot.forEach(child => {
+            console.log('🔵 [TRACE] Найдено сообщение:', child.key, child.val());
+            messages.push(child.val());
+        });
+        messages.sort((a,b) => a.timestamp - b.timestamp);
+        console.log('🔵 [TRACE] Всего сообщений:', messages.length);
+        
+        const container = document.getElementById('messages');
+        console.log('🔵 [TRACE] Контейнер messages найден:', !!container);
+        
+        if (container) {
+            const html = messages.map(msg => `
+                <div class="message ${msg.from === currentUser.id ? 'out' : 'in'}">
+                    <div>${msg.type === 'text' ? escapeHtml(msg.content) : 
+                         msg.type === 'audio' ? `<audio controls src="${msg.content}"></audio>` : 
+                         msg.type === 'file' ? `<a href="${msg.content}" download="${msg.name}">📎 ${msg.name}</a>` : 
+                         msg.content}</div>
+                    <div class="message-meta">${msg.from === currentUser.id ? 'Вы' : currentChat.name} • ${new Date(msg.timestamp).toLocaleTimeString()}</div>
+                </div>
+            `).join('');
+            console.log('🔵 [TRACE] HTML длина:', html.length);
+            container.innerHTML = html;
+            console.log('🟢 [TRACE] Сообщения отображены');
         }
     }
     
     async function sendMessage() {
         const text = document.getElementById('messageInput').value.trim();
         if (!text || !currentChat) return;
+        
+        console.log('🔵 [TRACE] sendMessage вызвана');
+        console.log('🔵 [TRACE] Текст:', text);
+        console.log('🔵 [TRACE] currentChat:', currentChat.id, currentChat.name);
         
         const msgId = Date.now().toString();
         const msgData = {
@@ -1189,17 +1202,27 @@
             content: text,
             timestamp: Date.now()
         };
+        console.log('🔵 [TRACE] Данные сообщения:', msgData);
         
-        try {
-            await db.ref(`messages/${currentChat.id}/${currentUser.id}/${msgId}`).set(msgData);
-            await db.ref(`messages/${currentUser.id}/${currentChat.id}/${msgId}`).set(msgData);
-            
-            document.getElementById('messageInput').value = '';
-            await loadMessages();
-            console.log('✅ Сообщение отправлено:', text);
-        } catch(e) {
-            console.error('❌ Ошибка отправки:', e);
+        console.log('🔵 [TRACE] Запись в БД для получателя...');
+        await db.ref(`messages/${currentChat.id}/${currentUser.id}/${msgId}`).set(msgData);
+        console.log('🔵 [TRACE] Запись в БД для отправителя...');
+        await db.ref(`messages/${currentUser.id}/${currentChat.id}/${msgId}`).set(msgData);
+        
+        console.log('🔵 [TRACE] Проверка записи...');
+        const check = await db.ref(`messages/${currentUser.id}/${currentChat.id}/${msgId}`).once('value');
+        if (check.exists()) {
+            console.log('🟢 [TRACE] Сообщение УСПЕШНО записано в БД');
+            console.log('🟢 [TRACE] Данные в БД:', check.val());
+        } else {
+            console.log('🔴 [TRACE] ОШИБКА: Сообщение НЕ записалось в БД');
         }
+        
+        document.getElementById('messageInput').value = '';
+        
+        console.log('🔵 [TRACE] Вызов loadMessages...');
+        await loadMessages();
+        console.log('🟢 [TRACE] Отправка завершена');
     }
     
     function selectFile() { document.getElementById('fileInput').click(); }
