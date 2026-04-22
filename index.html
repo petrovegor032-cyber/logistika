@@ -123,6 +123,10 @@
             border: 2px solid white;
         }
         
+        .online-indicator.offline {
+            background: #888;
+        }
+        
         .chat-container {
             display: none;
             position: fixed;
@@ -161,6 +165,7 @@
             padding: 10px 14px;
             border-radius: 18px;
             word-wrap: break-word;
+            position: relative;
         }
         
         .message.out {
@@ -177,6 +182,38 @@
             font-size: 10px;
             opacity: 0.7;
             margin-top: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .message-actions {
+            position: absolute;
+            top: -20px;
+            right: 0;
+            display: none;
+            gap: 4px;
+            background: rgba(0,0,0,0.7);
+            border-radius: 12px;
+            padding: 4px;
+        }
+        
+        .message:hover .message-actions {
+            display: flex;
+        }
+        
+        .message-action-btn {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 14px;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 8px;
+        }
+        
+        .message-action-btn:hover {
+            background: rgba(255,255,255,0.2);
         }
         
         .bottom-panel {
@@ -209,6 +246,11 @@
             color: white;
             font-size: 20px;
             cursor: pointer;
+            transition: transform 0.2s;
+        }
+        
+        .btn-icon:active {
+            transform: scale(0.95);
         }
         
         .btn-danger { background: #dc3545; }
@@ -282,6 +324,14 @@
             border-radius: 40px;
             font-size: 14px;
             z-index: 400;
+            animation: fadeInOut 2s ease;
+        }
+        
+        @keyframes fadeInOut {
+            0% { opacity: 0; transform: translateX(-50%) translateY(20px); }
+            15% { opacity: 1; transform: translateX(-50%) translateY(0); }
+            85% { opacity: 1; transform: translateX(-50%) translateY(0); }
+            100% { opacity: 0; transform: translateX(-50%) translateY(20px); }
         }
         
         .ad-card {
@@ -337,6 +387,11 @@
             border-radius: 16px;
             cursor: pointer;
             text-align: center;
+            transition: all 0.3s;
+        }
+        
+        .menu-item:active {
+            transform: scale(0.98);
         }
         
         .menu-item.danger {
@@ -477,6 +532,36 @@
             border-radius: 8px;
             display: inline-block;
         }
+        
+        .loading-spinner {
+            text-align: center;
+            padding: 20px;
+            color: rgba(255,255,255,0.6);
+        }
+        
+        .search-input {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 20px;
+            width: 100%;
+        }
+        
+        .message-search-results {
+            position: absolute;
+            top: 60px;
+            right: 10px;
+            background: rgba(0,0,0,0.9);
+            border-radius: 12px;
+            padding: 8px;
+            max-width: 250px;
+            z-index: 100;
+        }
+        
+        button {
+            transition: all 0.2s;
+        }
     </style>
 </head>
 <body>
@@ -486,6 +571,7 @@
 <div class="header">
     <button class="menu-btn" onclick="toggleMenu()">☰</button>
     <h2>✨ AudioDisk</h2>
+    <button class="menu-btn" onclick="openSearchInChat()" style="font-size: 20px;">🔍</button>
 </div>
 
 <div id="page-main" class="page active">
@@ -515,16 +601,18 @@
         <div style="flex:1"><div id="chatName" style="font-weight:bold"></div><div id="chatLogin" style="font-size:11px"></div></div>
         <button class="btn-icon" id="blockUserBtn" onclick="toggleBlockUser()">🚫</button>
         <button class="btn-icon" id="deleteChatBtn" onclick="deleteChat()">🗑️</button>
-        <button class="btn-icon" onclick="startCall()">📞</button>
+        <button class="btn-icon" id="callBtn" onclick="startCall()">📞</button>
         <button class="btn-icon btn-danger" id="endCallBtn" onclick="endCall()" style="display: none;">🔴</button>
     </div>
-    <div class="messages" id="messages"></div>
+    <div class="messages" id="messages">
+        <div class="loading-spinner">⏳ Загрузка сообщений...</div>
+    </div>
     <div class="bottom-panel">
         <button class="btn-icon" onclick="selectFile()">📎</button>
         <button class="btn-icon" id="recordBtn" onclick="toggleRecording()">🎤</button>
         <textarea class="message-input" id="messageInput" placeholder="Сообщение" rows="1"></textarea>
         <button class="btn-icon" onclick="sendMessage()">✏️</button>
-        <input type="file" id="fileInput" style="display:none" accept="*/*">
+        <input type="file" id="fileInput" style="display:none" accept="image/*,video/*,audio/*,application/*">
     </div>
 </div>
 
@@ -655,6 +743,24 @@
     </div>
 </div>
 
+<div id="editMessageModal" class="modal">
+    <div class="modal-content">
+        <span class="modal-close" onclick="closeModal('editMessageModal')">✕</span>
+        <h3>✏️ Редактировать сообщение</h3>
+        <textarea id="editMessageText" rows="3" placeholder="Новый текст"></textarea>
+        <button class="btn-icon" onclick="saveMessageEdit()" style="width:100%">Сохранить</button>
+    </div>
+</div>
+
+<div id="searchMessagesModal" class="modal">
+    <div class="modal-content">
+        <span class="modal-close" onclick="closeModal('searchMessagesModal')">✕</span>
+        <h3>🔍 Поиск в чате</h3>
+        <input type="text" id="messageSearchInput" placeholder="Поиск...">
+        <div id="messageSearchResults" style="max-height: 300px; overflow-y: auto; margin-top: 12px;"></div>
+    </div>
+</div>
+
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
@@ -688,6 +794,8 @@
     let localStream = null;
     let peerConnection = null;
     let callActive = false;
+    let editingMessageId = null;
+    let onlineStatusListeners = {};
     
     // ========== ИСКОРКИ ==========
     function initSparks() {
@@ -828,7 +936,7 @@
         
         const userId = Date.now().toString();
         await db.ref(`users/${userId}`).set({
-            login, password: btoa(password), name: login, avatar: '😎', created_at: Date.now()
+            login, password: btoa(password), name: login, avatar: '😎', created_at: Date.now(), online: true
         });
         
         currentUser = { id: userId, login, name: login, avatar: '😎' };
@@ -837,6 +945,10 @@
         initMap();
         loadData();
         setupMessageListener();
+        setupNotificationListener();
+        setupOnlineStatusListener();
+        setupCallListener();
+        requestNotificationPermission();
         showToast('Регистрация успешна!');
     }
     
@@ -859,6 +971,10 @@
         initMap();
         loadData();
         setupMessageListener();
+        setupNotificationListener();
+        setupOnlineStatusListener();
+        setupCallListener();
+        requestNotificationPermission();
         showToast('Добро пожаловать!');
     }
     
@@ -870,6 +986,9 @@
             initMap();
             loadData();
             setupMessageListener();
+            setupNotificationListener();
+            setupOnlineStatusListener();
+            setupCallListener();
             requestNotificationPermission();
         } else {
             openModal('authModal');
@@ -966,6 +1085,93 @@
         loadChats();
     }
     
+    // ========== РЕДАКТИРОВАНИЕ СООБЩЕНИЙ ==========
+    function editMessage(msgId, currentText) {
+        editingMessageId = msgId;
+        document.getElementById('editMessageText').value = currentText;
+        openModal('editMessageModal');
+    }
+    
+    async function saveMessageEdit() {
+        const newText = document.getElementById('editMessageText').value.trim();
+        if (!newText || !editingMessageId || !currentChat) return;
+        
+        const updateData = {
+            content: newText,
+            edited: true,
+            editedAt: Date.now()
+        };
+        
+        await db.ref(`messages/${currentUser.id}/${currentChat.id}/${editingMessageId}`).update(updateData);
+        await db.ref(`messages/${currentChat.id}/${currentUser.id}/${editingMessageId}`).update(updateData);
+        
+        closeModal('editMessageModal');
+        editingMessageId = null;
+        await loadMessages();
+        showToast('Сообщение отредактировано');
+    }
+    
+    async function deleteMessage(msgId) {
+        if (!confirm('Удалить сообщение?')) return;
+        
+        await db.ref(`messages/${currentUser.id}/${currentChat.id}/${msgId}`).remove();
+        await db.ref(`messages/${currentChat.id}/${currentUser.id}/${msgId}`).remove();
+        
+        await loadMessages();
+        showToast('Сообщение удалено');
+    }
+    
+    // ========== ПОИСК В ЧАТЕ ==========
+    function openSearchInChat() {
+        if (!currentChat) {
+            showToast('Сначала откройте чат');
+            return;
+        }
+        openModal('searchMessagesModal');
+        document.getElementById('messageSearchInput').value = '';
+        document.getElementById('messageSearchResults').innerHTML = '';
+        
+        document.getElementById('messageSearchInput').oninput = async (e) => {
+            const query = e.target.value.toLowerCase();
+            if (!query || query.length < 2) {
+                document.getElementById('messageSearchResults').innerHTML = '';
+                return;
+            }
+            
+            const snapshot = await db.ref(`messages/${currentUser.id}/${currentChat.id}`).once('value');
+            const results = [];
+            snapshot.forEach(child => {
+                const msg = child.val();
+                if (msg.type === 'text' && msg.content.toLowerCase().includes(query)) {
+                    results.push({ id: child.key, ...msg });
+                }
+            });
+            
+            document.getElementById('messageSearchResults').innerHTML = results.map(r => `
+                <div class="ad-card" onclick="scrollToMessage('${r.id}')">
+                    <div>${escapeHtml(r.content.substring(0, 100))}</div>
+                    <small>${new Date(r.timestamp).toLocaleString()}</small>
+                </div>
+            `).join('');
+            
+            if (results.length === 0) {
+                document.getElementById('messageSearchResults').innerHTML = '<div style="text-align:center; padding:20px;">❌ Ничего не найдено</div>';
+            }
+        };
+    }
+    
+    function scrollToMessage(msgId) {
+        closeModal('searchMessagesModal');
+        const element = document.getElementById(`msg-${msgId}`);
+        if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            element.style.backgroundColor = 'rgba(255,255,0,0.2)';
+            setTimeout(() => {
+                element.style.backgroundColor = '';
+            }, 2000);
+        }
+    }
+    
     // ========== ПРОФИЛЬ ==========
     function showProfileModal() {
         document.getElementById('profileName').value = currentUser.name || currentUser.login;
@@ -1034,6 +1240,82 @@
     function showStatusModal() {
         loadMyStatus();
         openModal('statusModal');
+    }
+    
+    // ========== ОНЛАЙН СТАТУС ==========
+    function setupOnlineStatusListener() {
+        if (!currentUser) return;
+        
+        const usersRef = db.ref('users');
+        usersRef.on('child_changed', (snap) => {
+            const userData = snap.val();
+            updateOnlineIndicator(snap.key, userData.online);
+        });
+    }
+    
+    function updateOnlineIndicator(userId, isOnline) {
+        const indicators = document.querySelectorAll(`.contact-item[data-user-id="${userId}"] .online-indicator`);
+        indicators.forEach(indicator => {
+            if (isOnline) {
+                indicator.classList.remove('offline');
+            } else {
+                indicator.classList.add('offline');
+            }
+        });
+    }
+    
+    // ========== АВТОДОБАВЛЕНИЕ КОНТАКТОВ ==========
+    async function ensureContactAndChat(receiverId, receiverName, receiverLogin) {
+        const contactExists = await db.ref(`contacts/${currentUser.id}/${receiverId}`).once('value');
+        
+        if (!contactExists.exists()) {
+            await db.ref(`contacts/${currentUser.id}/${receiverId}`).set({
+                name: receiverName || receiverLogin,
+                login: receiverLogin,
+                added_at: Date.now(),
+                auto_added: true
+            });
+            
+            await db.ref(`notifications/${receiverId}/${currentUser.id}`).set({
+                type: 'new_chat',
+                from: currentUser.id,
+                fromName: currentUser.name,
+                fromLogin: currentUser.login,
+                timestamp: Date.now(),
+                read: false
+            });
+            
+            showToast(`✅ ${receiverName || receiverLogin} добавлен в контакты автоматически`);
+            await loadContacts();
+            return true;
+        }
+        return false;
+    }
+    
+    function setupNotificationListener() {
+        if (!currentUser) return;
+        
+        db.ref(`notifications/${currentUser.id}`).on('child_added', async (snap) => {
+            const notif = snap.val();
+            if (notif.type === 'new_chat' && !notif.read) {
+                const contactExists = await db.ref(`contacts/${currentUser.id}/${notif.from}`).once('value');
+                
+                if (!contactExists.exists()) {
+                    await db.ref(`contacts/${currentUser.id}/${notif.from}`).set({
+                        name: notif.fromName,
+                        login: notif.fromLogin,
+                        added_at: Date.now(),
+                        auto_added: true
+                    });
+                    
+                    showToast(`📨 Новый чат от ${notif.fromName}`);
+                    await loadContacts();
+                    await loadChats();
+                }
+                
+                await snap.ref.update({ read: true });
+            }
+        });
     }
     
     // ========== КАРТА ==========
@@ -1128,7 +1410,7 @@
                     ` : ''}
                 </div>
                 ${ad.photoUrl ? `<img src="${ad.photoUrl}" style="max-width:100%; border-radius:12px; margin-top:8px;">` : ''}
-                <button onclick="event.stopPropagation(); openChatFromAd('${ad.userId}')" style="margin-top:8px; background:rgba(102,126,234,0.5); border:none; padding:8px; border-radius:20px; color:white;">💬 Написать автору</button>
+                <button onclick="event.stopPropagation(); openChatFromAd('${ad.userId}', '${escapeHtml(ad.userLogin)}')" style="margin-top:8px; background:rgba(102,126,234,0.5); border:none; padding:8px; border-radius:20px; color:white;">💬 Написать автору</button>
             </div>
         `).join('');
         
@@ -1142,7 +1424,7 @@
                 marker.bindPopup(`
                     <b>${escapeHtml(ad.text)}</b><br>
                     ${ad.price ? `💰 ${ad.price}₽<br>` : ''}
-                    <button onclick="openChatFromAd('${ad.userId}')">💬 Написать</button>
+                    <button onclick="openChatFromAd('${ad.userId}', '${escapeHtml(ad.userLogin)}')">💬 Написать</button>
                 `);
                 markers.push(marker);
             });
@@ -1198,16 +1480,24 @@
         openModal('myAdsModal');
     }
     
-    function openChatFromAd(userId) {
+    async function openChatFromAd(userId, userLogin) {
         closeModal('myAdsModal');
         closeModal('addAdModal');
-        switchPage('main');
-        const contact = contacts.find(c => c.id === userId);
-        if (contact) {
-            openChat(contact);
-        } else {
-            showToast('Сначала добавьте этого пользователя в контакты');
+        
+        const userSnap = await db.ref(`users/${userId}`).once('value');
+        const userData = userSnap.val();
+        
+        if (!userData) {
+            showToast('Пользователь не найден');
+            return;
         }
+        
+        const contact = { id: userId, login: userLogin, name: userData.name, avatar: userData.avatar || '👤' };
+        
+        await ensureContactAndChat(userId, userData.name, userLogin);
+        
+        switchPage('main');
+        openChat(contact);
     }
     
     // ========== КОНТАКТЫ ==========
@@ -1262,21 +1552,24 @@
         messagesRef.on('child_added', async (snap) => {
             const contactId = snap.key;
             const contact = contacts.find(c => c.id === contactId);
-            const msgs = snap.val();
-            const lastMsg = Object.values(msgs).sort((a, b) => b.timestamp - a.timestamp)[0];
             
-            if (lastMsg && lastMsg.from !== currentUser.id && contact && !isBlocked(contactId)) {
-                const isChatOpen = (currentChat && currentChat.id === contactId);
-                if (!isChatOpen) {
-                    showNotification(contact.name, lastMsg.content?.substring(0, 100) || '📎 Файл или 🎤 Аудио');
-                } else {
-                    showToast(`📨 ${contact.name}: ${lastMsg.content?.substring(0, 50) || 'Файл или аудио'}`);
+            if (contact && !isBlocked(contactId)) {
+                const msgs = snap.val();
+                const lastMsg = Object.values(msgs).sort((a, b) => b.timestamp - a.timestamp)[0];
+                
+                if (lastMsg && lastMsg.from !== currentUser.id) {
+                    const isChatOpen = (currentChat && currentChat.id === contactId);
+                    if (!isChatOpen) {
+                        showNotification(contact.name, lastMsg.content?.substring(0, 100) || '📎 Файл или 🎤 Аудио');
+                    } else {
+                        showToast(`📨 ${contact.name}: ${lastMsg.content?.substring(0, 50) || 'Файл или аудио'}`);
+                    }
                 }
             }
             
-            loadChats();
+            await loadChats();
             if (currentChat && contactId === currentChat.id && !isBlocked(contactId)) {
-                loadMessages();
+                await loadMessages();
             }
         });
     }
@@ -1287,11 +1580,12 @@
         const snapshot = await db.ref('users').orderByChild('login').equalTo(login).once('value');
         if (!snapshot.exists()) return showToast('Пользователь не найден');
         let contactId;
-        snapshot.forEach(child => contactId = child.key);
+        let contactData;
+        snapshot.forEach(child => { contactId = child.key; contactData = child.val(); });
         if (contactId === currentUser.id) return showToast('Нельзя добавить себя');
         if (isBlocked(contactId)) return showToast('Этот пользователь заблокирован');
         
-        await db.ref(`contacts/${currentUser.id}/${contactId}`).set({ name: login, added_at: Date.now() });
+        await db.ref(`contacts/${currentUser.id}/${contactId}`).set({ name: contactData.name || login, login: login, added_at: Date.now() });
         showToast('Контакт добавлен');
         closeModal('addContactModal');
         await loadContacts();
@@ -1302,7 +1596,7 @@
         const search = document.getElementById('contactSearch')?.value?.toLowerCase() || '';
         const filtered = contacts.filter(c => c.name.toLowerCase().includes(search) && !isBlocked(c.id));
         document.getElementById('contactsList').innerHTML = filtered.map(c => `
-            <div class="contact-item" onclick='openChat(${JSON.stringify(c).replace(/"/g, '&quot;')})'>
+            <div class="contact-item" data-user-id="${c.id}" onclick='openChat(${JSON.stringify(c).replace(/"/g, '&quot;')})'>
                 <div class="contact-avatar">${c.avatar}<span class="online-indicator"></span></div>
                 <div style="flex:1">
                     <b>${escapeHtml(c.name)}</b><br>
@@ -1314,6 +1608,12 @@
                 </div>
             </div>
         `).join('');
+        
+        filtered.forEach(c => {
+            db.ref(`users/${c.id}/online`).once('value', snap => {
+                updateOnlineIndicator(c.id, snap.val());
+            });
+        });
     }
     
     // ========== ЧАТЫ ==========
@@ -1339,7 +1639,7 @@
         const search = document.getElementById('chatSearch')?.value?.toLowerCase() || '';
         const filtered = chats.filter(c => c.contact.name.toLowerCase().includes(search));
         document.getElementById('chatsList').innerHTML = filtered.map(c => `
-            <div class="contact-item" onclick='openChat(${JSON.stringify(c.contact).replace(/"/g, '&quot;')})'>
+            <div class="contact-item" data-user-id="${c.contact.id}" onclick='openChat(${JSON.stringify(c.contact).replace(/"/g, '&quot;')})'>
                 <div class="contact-avatar">${c.contact.avatar}<span class="online-indicator"></span></div>
                 <div style="flex:1">
                     <b>${escapeHtml(c.contact.name)}</b><br>
@@ -1348,6 +1648,12 @@
                 <small>${new Date(c.lastMsg.timestamp).toLocaleTimeString()}</small>
             </div>
         `).join('');
+        
+        filtered.forEach(c => {
+            db.ref(`users/${c.contact.id}/online`).once('value', snap => {
+                updateOnlineIndicator(c.contact.id, snap.val());
+            });
+        });
     }
     
     function openChat(contact) {
@@ -1389,51 +1695,66 @@
         document.getElementById('chatContainer').classList.remove('active');
     }
     
-    function formatMessageContent(msg) {
-        if (msg.type === 'text') return escapeHtml(msg.content);
-        if (msg.type === 'audio') return `<audio controls src="${msg.content}" class="audio-player"></audio>`;
-        if (msg.type === 'photo') return `<img src="${msg.content}" class="message-image" onclick="window.open('${msg.content}','_blank')">`;
-        if (msg.type === 'video') return `<video controls src="${msg.content}" class="message-video"></video>`;
-        if (msg.type === 'file') return `<a href="${msg.content}" download="${msg.name}" class="message-file">📎 ${escapeHtml(msg.name)}</a>`;
-        return msg.content;
+    function formatMessageContent(msg, msgId) {
+        let content = '';
+        if (msg.type === 'text') content = escapeHtml(msg.content) + (msg.edited ? ' <small>(ред.)</small>' : '');
+        if (msg.type === 'audio') content = `<audio controls src="${msg.content}" class="audio-player"></audio>`;
+        if (msg.type === 'photo') content = `<img src="${msg.content}" class="message-image" onclick="window.open('${msg.content}','_blank')">`;
+        if (msg.type === 'video') content = `<video controls src="${msg.content}" class="message-video"></video>`;
+        if (msg.type === 'file') content = `<a href="${msg.content}" download="${msg.name}" class="message-file">📎 ${escapeHtml(msg.name)}</a>`;
+        
+        if (msg.from === currentUser.id && msg.type === 'text') {
+            content += `
+                <div class="message-actions">
+                    <button class="message-action-btn" onclick="editMessage('${msgId}', '${escapeHtml(msg.content).replace(/'/g, "\\'")}')">✏️</button>
+                    <button class="message-action-btn" onclick="deleteMessage('${msgId}')">🗑️</button>
+                </div>
+            `;
+        } else if (msg.from === currentUser.id) {
+            content += `
+                <div class="message-actions">
+                    <button class="message-action-btn" onclick="deleteMessage('${msgId}')">🗑️</button>
+                </div>
+            `;
+        }
+        
+        return content;
     }
     
     async function loadMessages() {
-        if (!currentChat || isBlocked(currentChat.id)) return;
-        
-        console.log('🔵 [TRACE] loadMessages вызвана');
-        console.log('🔵 [TRACE] currentChat:', currentChat.id, currentChat.name);
-        
-        const path = `messages/${currentUser.id}/${currentChat.id}`;
-        console.log('🔵 [TRACE] Путь в БД:', path);
-        
-        const snapshot = await db.ref(path).orderByKey().limitToLast(50).once('value');
-        console.log('🔵 [TRACE] snapshot.exists():', snapshot.exists());
-        console.log('🔵 [TRACE] snapshot.numChildren():', snapshot.numChildren());
-        
-        const messages = [];
-        snapshot.forEach(child => {
-            console.log('🔵 [TRACE] Найдено сообщение:', child.key, child.val());
-            messages.push(child.val());
-        });
-        messages.sort((a, b) => a.timestamp - b.timestamp);
-        console.log('🔵 [TRACE] Всего сообщений:', messages.length);
+        if (!currentChat || isBlocked(currentChat.id)) {
+            const container = document.getElementById('messages');
+            if (container) container.innerHTML = '<div style="text-align:center; padding:40px;">💬 Чат недоступен</div>';
+            return;
+        }
         
         const container = document.getElementById('messages');
-        console.log('🔵 [TRACE] Контейнер messages найден:', !!container);
+        container.innerHTML = '<div class="loading-spinner">⏳ Загрузка сообщений...</div>';
         
-        if (container) {
+        try {
+            const snapshot = await db.ref(`messages/${currentUser.id}/${currentChat.id}`).orderByKey().limitToLast(50).once('value');
+            const messages = [];
+            snapshot.forEach(child => {
+                messages.push({ id: child.key, ...child.val() });
+            });
+            messages.sort((a, b) => a.timestamp - b.timestamp);
+            
             if (messages.length === 0) {
                 container.innerHTML = '<div style="text-align:center; padding:40px;">💬 Нет сообщений</div>';
             } else {
                 container.innerHTML = messages.map(msg => `
-                    <div class="message ${msg.from === currentUser.id ? 'out' : 'in'}">
-                        <div>${formatMessageContent(msg)}</div>
-                        <div class="message-meta">${msg.from === currentUser.id ? 'Вы' : currentChat.name} • ${new Date(msg.timestamp).toLocaleTimeString()}</div>
+                    <div class="message ${msg.from === currentUser.id ? 'out' : 'in'}" id="msg-${msg.id}">
+                        <div>${formatMessageContent(msg, msg.id)}</div>
+                        <div class="message-meta">
+                            <span>${msg.from === currentUser.id ? 'Вы' : currentChat.name}</span>
+                            <span>${new Date(msg.timestamp).toLocaleTimeString()}</span>
+                        </div>
                     </div>
                 `).join('');
             }
-            console.log('🟢 [TRACE] Сообщения отображены');
+        } catch(e) {
+            console.error('Ошибка загрузки сообщений:', e);
+            container.innerHTML = '<div style="text-align:center; padding:40px;">❌ Ошибка загрузки сообщений</div>';
         }
     }
     
@@ -1441,9 +1762,11 @@
         const text = document.getElementById('messageInput').value.trim();
         if (!text || !currentChat || isBlocked(currentChat.id)) return;
         
-        console.log('🔵 [TRACE] sendMessage вызвана');
-        console.log('🔵 [TRACE] Текст:', text);
-        console.log('🔵 [TRACE] currentChat:', currentChat.id, currentChat.name);
+        const userSnap = await db.ref(`users/${currentChat.id}`).once('value');
+        const userData = userSnap.val();
+        if (userData) {
+            await ensureContactAndChat(currentChat.id, userData.name, userData.login);
+        }
         
         const msgId = Date.now().toString();
         const msgData = {
@@ -1451,33 +1774,29 @@
             to: currentChat.id,
             type: 'text',
             content: text,
-            timestamp: Date.now()
+            timestamp: Date.now(),
+            delivered: false
         };
-        console.log('🔵 [TRACE] Данные сообщения:', msgData);
         
-        console.log('🔵 [TRACE] Запись в БД для получателя...');
-        await db.ref(`messages/${currentChat.id}/${currentUser.id}/${msgId}`).set(msgData);
-        console.log('🔵 [TRACE] Запись в БД для отправителя...');
-        await db.ref(`messages/${currentUser.id}/${currentChat.id}/${msgId}`).set(msgData);
-        
-        console.log('🔵 [TRACE] Проверка записи...');
-        const check = await db.ref(`messages/${currentUser.id}/${currentChat.id}/${msgId}`).once('value');
-        if (check.exists()) {
-            console.log('🟢 [TRACE] Сообщение УСПЕШНО записано в БД');
-            console.log('🟢 [TRACE] Данные в БД:', check.val());
-        } else {
-            console.log('🔴 [TRACE] ОШИБКА: Сообщение НЕ записалось в БД');
+        try {
+            await Promise.all([
+                db.ref(`messages/${currentChat.id}/${currentUser.id}/${msgId}`).set(msgData),
+                db.ref(`messages/${currentUser.id}/${currentChat.id}/${msgId}`).set(msgData)
+            ]);
+            
+            const check = await db.ref(`messages/${currentUser.id}/${currentChat.id}/${msgId}`).once('value');
+            if (!check.exists()) throw new Error('Запись не удалась');
+            
+            document.getElementById('messageInput').value = '';
+            await loadMessages();
+            
+            const container = document.getElementById('messages');
+            if (container) container.scrollTop = container.scrollHeight;
+            
+        } catch(e) {
+            console.error('❌ Ошибка отправки:', e);
+            showToast('Ошибка отправки сообщения');
         }
-        
-        document.getElementById('messageInput').value = '';
-        
-        console.log('🔵 [TRACE] Вызов loadMessages...');
-        await loadMessages();
-        
-        const container = document.getElementById('messages');
-        if (container) container.scrollTop = container.scrollHeight;
-        
-        console.log('🟢 [TRACE] Отправка завершена');
     }
     
     function selectFile() { document.getElementById('fileInput').click(); }
@@ -1495,6 +1814,12 @@
             return;
         }
         
+        const userSnap = await db.ref(`users/${currentChat.id}`).once('value');
+        const userData = userSnap.val();
+        if (userData) {
+            await ensureContactAndChat(currentChat.id, userData.name, userData.login);
+        }
+        
         const fileType = detectFileType(file.name, file.type);
         const reader = new FileReader();
         reader.onload = async (ev) => {
@@ -1507,8 +1832,10 @@
                 content: ev.target.result,
                 timestamp: Date.now()
             };
-            await db.ref(`messages/${currentChat.id}/${currentUser.id}/${msgId}`).set(msgData);
-            await db.ref(`messages/${currentUser.id}/${currentChat.id}/${msgId}`).set(msgData);
+            await Promise.all([
+                db.ref(`messages/${currentChat.id}/${currentUser.id}/${msgId}`).set(msgData),
+                db.ref(`messages/${currentUser.id}/${currentChat.id}/${msgId}`).set(msgData)
+            ]);
             await loadMessages();
             const container = document.getElementById('messages');
             if (container) container.scrollTop = container.scrollHeight;
@@ -1532,10 +1859,19 @@
                     const reader = new FileReader();
                     reader.onload = async () => {
                         if (!currentChat || isBlocked(currentChat.id)) return;
+                        
+                        const userSnap = await db.ref(`users/${currentChat.id}`).once('value');
+                        const userData = userSnap.val();
+                        if (userData) {
+                            await ensureContactAndChat(currentChat.id, userData.name, userData.login);
+                        }
+                        
                         const msgId = Date.now().toString();
                         const msgData = { from: currentUser.id, to: currentChat.id, type: 'audio', content: reader.result, timestamp: Date.now() };
-                        await db.ref(`messages/${currentChat.id}/${currentUser.id}/${msgId}`).set(msgData);
-                        await db.ref(`messages/${currentUser.id}/${currentChat.id}/${msgId}`).set(msgData);
+                        await Promise.all([
+                            db.ref(`messages/${currentChat.id}/${currentUser.id}/${msgId}`).set(msgData),
+                            db.ref(`messages/${currentUser.id}/${currentChat.id}/${msgId}`).set(msgData)
+                        ]);
                         await loadMessages();
                         const container = document.getElementById('messages');
                         if (container) container.scrollTop = container.scrollHeight;
@@ -1558,9 +1894,11 @@
             if (snap.exists() && !callActive) {
                 const offerData = snap.val();
                 const fromUserId = offerData.from;
-                const fromUser = contacts.find(c => c.id === fromUserId);
+                const fromUserSnap = await db.ref(`users/${fromUserId}`).once('value');
+                const fromUserData = fromUserSnap.val();
+                const fromName = fromUserData?.name || fromUserId;
                 
-                if (fromUser && confirm(`📞 Входящий звонок от ${fromUser.name}. Ответить?`)) {
+                if (confirm(`📞 Входящий звонок от ${fromName}. Ответить?`)) {
                     await acceptCall(fromUserId, offerData.offer);
                     await snap.ref.remove();
                 } else {
@@ -1581,11 +1919,9 @@
             return;
         }
         
-        // Проверка наличия кнопок
         const callBtn = document.getElementById('callBtn');
         const endCallBtn = document.getElementById('endCallBtn');
         
-        console.log('📞 Начинаем звонок:', currentChat.name);
         showToast(`📞 Звонок ${currentChat.name}...`);
         
         try {
@@ -1615,7 +1951,6 @@
             
             peerConnection.onicecandidate = (event) => {
                 if (event.candidate) {
-                    console.log('🧊 ICE кандидат:', event.candidate.type);
                     db.ref(`calls/${currentChat.id}/candidates`).push({
                         candidate: {
                             candidate: event.candidate.candidate,
@@ -1682,8 +2017,6 @@
     }
     
     async function acceptCall(fromUserId, offer) {
-        console.log('📞 Принимаем звонок от:', fromUserId);
-        
         const callBtn = document.getElementById('callBtn');
         const endCallBtn = document.getElementById('endCallBtn');
         
@@ -1772,7 +2105,6 @@
         if (callBtn) callBtn.style.display = 'flex';
         if (endCallBtn) endCallBtn.style.display = 'none';
         
-        console.log('📞 Звонок завершен');
         showToast('📞 Звонок завершен');
     }
     
