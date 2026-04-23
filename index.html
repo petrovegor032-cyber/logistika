@@ -853,6 +853,14 @@
             loadData();
             setupMessageListener();
             requestNotificationPermission();
+            
+            // Активация звука по касанию
+            document.body.addEventListener('touchstart', () => {
+                if (!window.raciaSoundEnabled) enableRaciaSound();
+            }, { once: true });
+            document.body.addEventListener('mousedown', () => {
+                if (!window.raciaSoundEnabled) enableRaciaSound();
+            }, { once: true });
         } else {
             openModal('authModal');
         }
