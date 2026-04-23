@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>AudioDisk - РАЦИЯ (тест)</title>
+    <title>AudioDisk - РАЦИЯ (без Storage)</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -50,9 +50,8 @@
             padding: 12px;
             font-family: monospace;
             font-size: 10px;
-            max-height: 300px;
+            max-height: 200px;
             overflow-y: auto;
-            white-space: pre-wrap;
         }
         .status {
             padding: 10px;
@@ -70,7 +69,7 @@
             margin-top: 8px;
             border-radius: 2px;
         }
-        .peer { border-left: 3px solid #667eea; padding-left: 16px; margin: 12px 0; }
+        .peer { border-left: 3px solid #667eea; padding-left: 16px; margin: 12px 0; cursor: pointer; }
         .message-bubble {
             background: rgba(102,126,234,0.3);
             border-radius: 16px;
@@ -78,12 +77,12 @@
             margin: 4px 0;
             font-size: 12px;
         }
+        audio { width: 100%; margin-top: 4px; }
     </style>
 </head>
 <body>
 <div class="container">
-    <h1>📻 РАЦИЯ AudioDisk</h1>
-    <p style="opacity:0.7;">🎤 Запись 1 секунда → автоматическая отправка → авто воспроизведение</p>
+    <h1>📻 РАЦИЯ (без CORS)</h1>
     
     <div class="card" id="authPanel">
         <input type="text" id="loginInput" placeholder="Логин">
@@ -94,7 +93,7 @@
     
     <div id="mainPanel" style="display:none;">
         <div class="card">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; justify-content: space-between;">
                 <h3>👤 <span id="myLogin">-</span></h3>
                 <div id="raciaStatus" class="status idle">⚪ Режим ожидания</div>
             </div>
@@ -116,7 +115,7 @@
         </div>
         
         <div class="card">
-            <h3>📋 СООБЩЕНИЯ РАЦИИ</h3>
+            <h3>📋 СООБЩЕНИЯ</h3>
             <div id="messagesList" class="log" style="max-height: 200px;"></div>
         </div>
         
@@ -130,7 +129,6 @@
 
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
 
 <script>
     const firebaseConfig = {
@@ -143,7 +141,6 @@
     
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
-    const storage = firebase.storage();
     
     let currentUser = null;
     let currentChannel = null;
@@ -153,7 +150,6 @@
     let audioContext = null;
     let analyserNode = null;
     let animationFrame = null;
-    let messageListenerRef = null;
     
     function addLog(msg, type = 'info') {
         const logDiv = document.getElementById('log');
@@ -169,9 +165,13 @@
         const time = new Date().toLocaleTimeString();
         container.innerHTML += `<div class="message-bubble" style="background: ${type === 'out' ? 'rgba(102,126,234,0.5)' : 'rgba(255,255,255,0.1)'}">
             <strong>${type === 'out' ? '📤 Я' : '📥 Собеседник'}</strong> ${time}<br>
-            <audio controls src="${msg.url}" style="width: 100%; margin-top: 4px;"></audio>
+            <audio controls src="${msg.url}" preload="auto"></audio>
         </div>`;
         container.scrollTop = container.scrollHeight;
+        
+        // Автовоспроизведение
+        const audio = container.querySelectorAll('audio:last-child')[0];
+        if (audio) audio.play().catch(e => addLog(`⚠️ Автовоспроизведение: ${e.message}`, 'warn'));
     }
     
     function clearLog() {
@@ -215,7 +215,7 @@
         document.getElementById('myLogin').innerText = currentUser.login;
         await loadUsers();
         setupRaciaListener();
-        addLog(`🎙️ Режим рации готов. Выбери собеседника и включи рацию.`, 'success');
+        addLog(`🎙️ Рация готова. Выбери собеседника и включи рацию.`, 'success');
     }
     
     async function loadUsers() {
@@ -224,8 +224,10 @@
         snapshot.forEach(child => {
             const user = child.val();
             if (user.login !== currentUser.login) {
-                html += `<div class="peer"><strong>${user.login}</strong> <span style="color:${user.online ? '#4caf50' : '#888'}">●</span>
-                    <button onclick="selectTarget('${user.login}')" style="padding:6px 12px; font-size:12px;">🎙️ Выбрать</button></div>`;
+                html += `<div class="peer" onclick="selectTarget('${user.login}')">
+                    <strong>${user.login}</strong> <span style="color:${user.online ? '#4caf50' : '#888'}">●</span>
+                    <span style="float:right;">🎙️ Выбрать</span>
+                </div>`;
             }
         });
         document.getElementById('usersList').innerHTML = html || '<div>Нет других пользователей</div>';
@@ -236,37 +238,26 @@
         addLog(`🎯 Выбран собеседник: ${login}`, 'success');
     }
     
-    // ========== ОСНОВНАЯ ЛОГИКА РАЦИИ ==========
+    // ========== РАЦИЯ ==========
     async function toggleRacia() {
-        if (raciaActive) {
-            stopRacia();
-        } else {
-            startRacia();
-        }
+        if (raciaActive) stopRacia();
+        else startRacia();
     }
     
     async function startRacia() {
         const targetLogin = document.getElementById('targetLogin').value.trim();
-        if (!targetLogin) {
-            addLog('❌ Выберите собеседника', 'error');
-            return;
-        }
+        if (!targetLogin) return addLog('❌ Выберите собеседника', 'error');
         
         const snapshot = await db.ref('users').orderByChild('login').equalTo(targetLogin).once('value');
-        if (!snapshot.exists()) {
-            addLog(`❌ Пользователь ${targetLogin} не найден`, 'error');
-            return;
-        }
+        if (!snapshot.exists()) return addLog(`❌ ${targetLogin} не найден`, 'error');
         
         let targetId;
         snapshot.forEach(child => { targetId = child.key; });
-        
         currentChannel = { id: targetId, login: targetLogin };
         
         addLog(`🎙️ Включаем рацию с ${targetLogin}...`, 'call');
         
         try {
-            // Запрашиваем микрофон
             mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
             addLog(`✅ Микрофон готов`, 'success');
             
@@ -303,9 +294,8 @@
             document.getElementById('raciaBtn').style.display = 'none';
             document.getElementById('stopRaciaBtn').style.display = 'inline-block';
             document.getElementById('raciaStatus').className = 'status talking';
-            document.getElementById('raciaStatus').innerHTML = '🎙️ РАЦИЯ АКТИВНА (говорите)';
+            document.getElementById('raciaStatus').innerHTML = '🎙️ РАЦИЯ АКТИВНА';
             
-            // Запускаем цикл записи и отправки
             startRecordingLoop();
             
         } catch(e) {
@@ -333,20 +323,22 @@
             if (blob.size > 500 && raciaActive && currentChannel) {
                 addLog(`📤 Отправка фрагмента (${Math.round(blob.size/1000)}KB)`, 'audio');
                 
-                const filename = `fragment_${Date.now()}_${Math.random()}.webm`;
-                const storageRef = storage.ref(`racia/${currentChannel.id}/${currentUser.id}/${filename}`);
-                await storageRef.put(blob);
-                const url = await storageRef.getDownloadURL();
-                
-                await db.ref(`racia/${currentChannel.id}/messages`).push({
-                    from: currentUser.id,
-                    fromLogin: currentUser.login,
-                    url: url,
-                    timestamp: Date.now()
-                });
-                
-                // Показываем в своем логе
-                addMessage({ url: url }, 'out');
+                // Конвертируем в base64 для отправки в Database
+                const reader = new FileReader();
+                reader.onload = async (ev) => {
+                    const base64 = ev.target.result;
+                    
+                    await db.ref(`racia/${currentChannel.id}/messages`).push({
+                        from: currentUser.id,
+                        fromLogin: currentUser.login,
+                        data: base64,
+                        timestamp: Date.now()
+                    });
+                    
+                    // Показываем в своем логе
+                    addMessage({ url: base64 }, 'out');
+                };
+                reader.readAsDataURL(blob);
             }
             
             if (raciaActive) setTimeout(() => startRecordingLoop(), 100);
@@ -361,28 +353,18 @@
     function setupRaciaListener() {
         if (!currentUser) return;
         
-        // Слушаем входящие сообщения
-        messageListenerRef = db.ref(`racia/${currentUser.id}/messages`);
-        messageListenerRef.on('child_added', (snap) => {
+        db.ref(`racia/${currentUser.id}/messages`).on('child_added', (snap) => {
             const msg = snap.val();
             if (msg && msg.from !== currentUser.id) {
-                addLog(`📥 Получено сообщение от ${msg.fromLogin}`, 'audio');
-                addMessage({ url: msg.url }, 'in');
-                
-                // Автоматическое воспроизведение
-                const audio = new Audio(msg.url);
-                audio.volume = 1.0;
-                audio.play().catch(e => addLog(`⚠️ Ошибка воспроизведения: ${e.message}`, 'warn'));
-                
-                // Удаляем сообщение после воспроизведения
+                addLog(`📥 Получено от ${msg.fromLogin}`, 'audio');
+                addMessage({ url: msg.data }, 'in');
                 snap.ref.remove();
             }
         });
         
-        // Слушаем запрос на включение рации от собеседника
         db.ref(`racia/${currentUser.id}/active`).on('value', (snap) => {
             const data = snap.val();
-            if (data && data.active && !raciaActive) {
+            if (data && data.active && !raciaActive && data.from !== currentUser.id) {
                 addLog(`📞 ${data.fromLogin} включает рацию!`, 'call');
                 if (confirm(`${data.fromLogin} хочет говорить. Разрешить?`)) {
                     document.getElementById('targetLogin').value = data.fromLogin;
@@ -394,7 +376,6 @@
     
     function stopRacia() {
         addLog(`🔴 Остановка рации...`);
-        
         raciaActive = false;
         
         if (recordingLoop) clearTimeout(recordingLoop);
@@ -404,11 +385,8 @@
         
         mediaStream = null;
         audioContext = null;
-        analyserNode = null;
         
-        if (currentChannel) {
-            db.ref(`racia/${currentChannel.id}/active`).remove();
-        }
+        if (currentChannel) db.ref(`racia/${currentChannel.id}/active`).remove();
         
         document.getElementById('raciaBtn').style.display = 'inline-block';
         document.getElementById('stopRaciaBtn').style.display = 'none';
@@ -417,7 +395,6 @@
         document.getElementById('micLevel').style.width = '0%';
         
         currentChannel = null;
-        
         addLog(`✅ Рация остановлена`, 'info');
     }
     
@@ -428,9 +405,7 @@
         afterLogin();
     }
     
-    addLog(`🚀 РАЦИЯ РЕЖИМ ЗАПУЩЕН`, 'success');
-    addLog(`📌 Инструкция: выбери собеседника -> Включить рацию -> говори`, 'info');
-    addLog(`📌 Сообщения записываются по 1 секунде и отправляются автоматически`, 'info');
+    addLog(`🚀 РАЦИЯ ЗАПУЩЕНА (без Storage)`, 'success');
 </script>
 </body>
 </html>
