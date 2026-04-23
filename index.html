@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>AudioDisk - ТЕСТ АУДИО СООБЩЕНИЙ</title>
+    <title>AudioDisk - РАЦИЯ (секундные фрагменты)</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -33,7 +33,8 @@
         }
         button.danger { background: #dc3545; }
         button.success { background: #28a745; }
-        button.warning { background: #ff9800; }
+        button.call { background: #4caf50; animation: pulse 1s infinite; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
         input {
             width: 100%;
             padding: 12px;
@@ -48,29 +49,37 @@
             border-radius: 16px;
             padding: 12px;
             font-family: monospace;
-            font-size: 11px;
-            max-height: 300px;
+            font-size: 10px;
+            max-height: 250px;
             overflow-y: auto;
             white-space: pre-wrap;
         }
-        .audio-message {
-            background: rgba(102,126,234,0.3);
+        .status {
+            padding: 10px;
             border-radius: 16px;
-            padding: 12px;
-            margin: 8px 0;
+            text-align: center;
+            font-weight: bold;
         }
-        audio { width: 100%; margin: 8px 0; }
-        .recording { animation: pulse 0.5s infinite; background: #dc3545; }
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
+        .status.idle { background: #333; }
+        .status.calling { background: #ff9800; }
+        .status.talking { background: #4caf50; }
+        .mic-level {
+            height: 4px;
+            background: #4caf50;
+            width: 0%;
+            transition: width 0.1s;
+            margin-top: 8px;
+            border-radius: 2px;
+        }
+        .peer { border-left: 3px solid #667eea; padding-left: 16px; margin: 12px 0; }
     </style>
 </head>
 <body>
 <div class="container">
-    <h1>🎤 ТЕСТ АУДИО СООБЩЕНИЙ</h1>
-    <p style="opacity:0.7;">Запись → Firebase Storage → Прослушивание</p>
+    <h1>📻 РАЦИЯ AudioDisk</h1>
+    <p style="opacity:0.7;">Секундные фрагменты | Автовоспроизведение | Real-time диалог</p>
     
     <div class="card" id="authPanel">
-        <h3>🔐 Авторизация</h3>
         <input type="text" id="loginInput" placeholder="Логин">
         <input type="password" id="passwordInput" placeholder="Пароль">
         <button onclick="register()">Регистрация</button>
@@ -79,27 +88,29 @@
     
     <div id="mainPanel" style="display:none;">
         <div class="card">
-            <h3>👤 Вы: <span id="myLogin">-</span></h3>
-            <div id="recordStatus">⚪ Готов к записи</div>
-        </div>
-        
-        <div class="card">
-            <h3>📞 Аудио сообщение</h3>
-            <input type="text" id="targetLogin" placeholder="Кому (логин)">
-            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                <button id="recordBtn" onclick="startRecording()">🎤 НАЧАТЬ ЗАПИСЬ</button>
-                <button id="stopBtn" onclick="stopRecording()" class="danger" style="display:none;">⏹️ ОСТАНОВИТЬ</button>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h3>👤 <span id="myLogin">-</span></h3>
+                <div id="callStatus" class="status idle">⚪ Режим ожидания</div>
             </div>
-            <div id="recordingTimer" style="font-size: 24px; text-align: center; margin: 12px 0;"></div>
+            <div class="mic-level" id="micLevel"></div>
         </div>
         
         <div class="card">
-            <h3>📥 Входящие аудио сообщения</h3>
-            <div id="incomingAudio"></div>
+            <h3>📞 Собеседник</h3>
+            <input type="text" id="targetLogin" placeholder="Логин для звонка">
+            <div style="display: flex; gap: 8px;">
+                <button id="callBtn" onclick="startCallRequest()">📞 ПОЗВОНИТЬ</button>
+                <button id="endCallBtn" onclick="endCall()" class="danger" style="display:none;">🔴 ЗАВЕРШИТЬ</button>
+            </div>
         </div>
         
         <div class="card">
-            <h3>📋 ЛОГ</h3>
+            <h3>📋 Другие пользователи</h3>
+            <div id="usersList"></div>
+        </div>
+        
+        <div class="card">
+            <h3>📋 ЛОГ ДИАЛОГА</h3>
             <button onclick="clearLog()">Очистить</button>
             <div id="log" class="log"></div>
         </div>
@@ -124,39 +135,41 @@
     const storage = firebase.storage();
     
     let currentUser = null;
+    let currentCallWith = null;
+    let isCallActive = false;
+    let isRecording = false;
+    let mediaStream = null;
     let mediaRecorder = null;
-    let audioChunks = [];
-    let recordingTimer = null;
-    let seconds = 0;
+    let recordingInterval = null;
+    let audioContext = null;
+    let sourceNode = null;
+    let analyserNode = null;
+    let animationFrame = null;
+    let playQueue = [];
+    let isPlaying = false;
     
     function addLog(msg, type = 'info') {
         const logDiv = document.getElementById('log');
         const time = new Date().toLocaleTimeString();
-        const colors = { info: '#aaa', success: '#4caf50', error: '#f44336', warn: '#ff9800', audio: '#2196f3' };
-        const logEntry = `<div style="color: ${colors[type] || colors.info}; border-bottom:1px solid #222; padding:4px 0;">[${time}] ${msg}</div>`;
-        logDiv.innerHTML += logEntry;
+        const colors = { info: '#aaa', success: '#4caf50', error: '#f44336', warn: '#ff9800', call: '#2196f3', audio: '#9c27b0' };
+        logDiv.innerHTML += `<div style="color: ${colors[type] || colors.info}; border-bottom:1px solid #222; padding:4px 0;">[${time}] ${msg}</div>`;
         logDiv.scrollTop = logDiv.scrollHeight;
         console.log(`[${time}] ${msg}`);
     }
     
     function clearLog() {
         document.getElementById('log').innerHTML = '';
-        addLog('📋 Лог очищен');
+        addLog('Лог очищен');
     }
     
     async function register() {
         const login = document.getElementById('loginInput').value.trim();
         const password = document.getElementById('passwordInput').value.trim();
         if (!login || !password) return addLog('Введите логин и пароль', 'error');
-        
         const snapshot = await db.ref('users').orderByChild('login').equalTo(login).once('value');
         if (snapshot.exists()) return addLog('Логин занят', 'error');
-        
         const userId = Date.now().toString();
-        await db.ref(`users/${userId}`).set({
-            login, password: btoa(password), name: login, created_at: Date.now(), online: true
-        });
-        
+        await db.ref(`users/${userId}`).set({ login, password: btoa(password), name: login, created_at: Date.now(), online: true });
         currentUser = { id: userId, login, name: login };
         localStorage.setItem('user', JSON.stringify(currentUser));
         addLog(`✅ Регистрация: ${login}`, 'success');
@@ -167,14 +180,11 @@
         const login = document.getElementById('loginInput').value.trim();
         const password = document.getElementById('passwordInput').value.trim();
         if (!login || !password) return addLog('Введите логин и пароль', 'error');
-        
         const snapshot = await db.ref('users').orderByChild('login').equalTo(login).once('value');
         if (!snapshot.exists()) return addLog('Пользователь не найден', 'error');
-        
         let userId, userData;
         snapshot.forEach(child => { userId = child.key; userData = child.val(); });
         if (btoa(password) !== userData.password) return addLog('Неверный пароль', 'error');
-        
         currentUser = { id: userId, login, name: userData.name };
         localStorage.setItem('user', JSON.stringify(currentUser));
         await db.ref(`users/${userId}/online`).set(true);
@@ -182,203 +192,276 @@
         afterLogin();
     }
     
-    function afterLogin() {
+    async function afterLogin() {
         document.getElementById('authPanel').style.display = 'none';
         document.getElementById('mainPanel').style.display = 'block';
         document.getElementById('myLogin').innerText = currentUser.login;
+        await loadUsers();
+        setupCallListener();
         setupAudioListener();
-        addLog(`✅ Готов к записи и отправке аудио`, 'success');
+        addLog(`🎤 Готов к звонкам (секундные фрагменты)`, 'success');
     }
     
-    // ЗАПИСЬ АУДИО
-    async function startRecording() {
-        if (mediaRecorder && mediaRecorder.state === 'recording') {
-            addLog('⚠️ Запись уже идет', 'warn');
-            return;
-        }
-        
+    async function loadUsers() {
+        const snapshot = await db.ref('users').once('value');
+        let html = '';
+        snapshot.forEach(child => {
+            const user = child.val();
+            if (user.login !== currentUser.login) {
+                html += `<div class="peer"><strong>${user.login}</strong> <span style="color:${user.online ? '#4caf50' : '#888'}">●</span>
+                    <button onclick="callTo('${user.login}')" style="padding:6px 12px; font-size:12px;">📞</button></div>`;
+            }
+        });
+        document.getElementById('usersList').innerHTML = html || '<div>Нет других пользователей</div>';
+    }
+    
+    function callTo(login) {
+        document.getElementById('targetLogin').value = login;
+        startCallRequest();
+    }
+    
+    // ========== ЗАПРОС ЗВОНКА ==========
+    async function startCallRequest() {
+        if (isCallActive) return addLog('Уже в звонке', 'warn');
         const targetLogin = document.getElementById('targetLogin').value.trim();
-        if (!targetLogin) {
-            addLog('❌ Укажите получателя', 'error');
-            return;
-        }
+        if (!targetLogin) return addLog('Введите логин', 'error');
         
-        addLog(`🎤 Запрос доступа к микрофону...`);
+        const snapshot = await db.ref('users').orderByChild('login').equalTo(targetLogin).once('value');
+        if (!snapshot.exists()) return addLog(`❌ ${targetLogin} не найден`, 'error');
         
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            audioChunks = [];
-            mediaRecorder = new MediaRecorder(stream);
-            
-            mediaRecorder.ondataavailable = (event) => {
-                if (event.data.size > 0) {
-                    audioChunks.push(event.data);
-                }
-            };
-            
-            mediaRecorder.onstop = async () => {
-                addLog(`⏹️ Запись остановлена, обрабатываем...`);
-                const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-                const audioUrl = URL.createObjectURL(audioBlob);
-                
-                // Для прослушивания на месте
-                const tempAudio = new Audio(audioUrl);
-                addLog(`🎵 Длительность: ${Math.round(audioBlob.size / 1000)} KB`, 'audio');
-                
-                // Отправляем
-                await sendAudio(targetLogin, audioBlob);
-                
-                stream.getTracks().forEach(track => track.stop());
-                URL.revokeObjectURL(audioUrl);
-            };
-            
-            mediaRecorder.start(1000);
-            addLog(`✅ Запись началась! Говорите...`, 'success');
-            
-            document.getElementById('recordBtn').style.display = 'none';
-            document.getElementById('stopBtn').style.display = 'inline-block';
-            document.getElementById('recordStatus').innerHTML = '🔴 ИДЕТ ЗАПИСЬ...';
-            document.getElementById('recordStatus').className = 'recording';
-            
-            // Таймер
-            seconds = 0;
-            recordingTimer = setInterval(() => {
-                seconds++;
-                const mins = Math.floor(seconds / 60);
-                const secs = seconds % 60;
-                document.getElementById('recordingTimer').innerText = `${mins.toString().padStart(2,'0')}:${secs.toString().padStart(2,'0')}`;
-                if (seconds >= 60) {
-                    addLog(`⏰ Автостоп через 60 секунд`, 'warn');
-                    stopRecording();
-                }
-            }, 1000);
-            
-        } catch(e) {
-            addLog(`❌ Ошибка доступа к микрофону: ${e.message}`, 'error');
-        }
-    }
-    
-    function stopRecording() {
-        if (mediaRecorder && mediaRecorder.state === 'recording') {
-            mediaRecorder.stop();
-            clearInterval(recordingTimer);
-            document.getElementById('recordBtn').style.display = 'inline-block';
-            document.getElementById('stopBtn').style.display = 'none';
-            document.getElementById('recordStatus').innerHTML = '⚪ Готов к записи';
-            document.getElementById('recordStatus').className = '';
-            document.getElementById('recordingTimer').innerText = '';
-            addLog(`⏹️ Запись остановлена`, 'info');
-        }
-    }
-    
-    // ОТПРАВКА АУДИО
-    async function sendAudio(toLogin, audioBlob) {
-        addLog(`📤 Поиск пользователя ${toLogin}...`);
+        let targetId;
+        snapshot.forEach(child => { targetId = child.key; });
+        currentCallWith = { id: targetId, login: targetLogin };
         
-        const snapshot = await db.ref('users').orderByChild('login').equalTo(toLogin).once('value');
-        if (!snapshot.exists()) {
-            addLog(`❌ Получатель ${toLogin} не найден`, 'error');
-            return;
-        }
+        addLog(`📞 Звоним ${targetLogin}...`, 'call');
+        document.getElementById('callStatus').className = 'status calling';
+        document.getElementById('callStatus').innerHTML = '📞 ЗВОНИМ...';
         
-        let targetId, targetData;
-        snapshot.forEach(child => { targetId = child.key; targetData = child.val(); });
+        const offerRef = db.ref(`call_requests/${targetId}`);
+        await offerRef.set({
+            from: currentUser.id,
+            fromLogin: currentUser.login,
+            timestamp: Date.now(),
+            status: 'ringing'
+        });
         
-        addLog(`✅ Получатель найден: ${targetData.login}`, 'success');
+        // Ожидание ответа 20 секунд
+        const responseRef = db.ref(`call_requests/${currentUser.id}/response`);
+        const timeout = setTimeout(() => {
+            if (!isCallActive) {
+                addLog(`⏰ Нет ответа`, 'warn');
+                endCall();
+            }
+        }, 20000);
         
-        // Загружаем в Storage
-        const filename = `audio_${Date.now()}.webm`;
-        const storageRef = storage.ref(`audio_messages/${targetId}/${currentUser.id}/${filename}`);
-        
-        addLog(`☁️ Загрузка в Firebase Storage...`);
-        
-        try {
-            const uploadTask = await storageRef.put(audioBlob);
-            const downloadUrl = await storageRef.getDownloadURL();
-            addLog(`✅ Аудио загружено, размер: ${Math.round(audioBlob.size / 1000)} KB`, 'success');
-            
-            // Сохраняем метаданные в Realtime Database
-            const messageId = Date.now().toString();
-            const messageData = {
-                from: currentUser.id,
-                fromLogin: currentUser.login,
-                fromName: currentUser.name,
-                to: targetId,
-                toLogin: targetData.login,
-                url: downloadUrl,
-                duration: seconds,
-                size: audioBlob.size,
-                timestamp: Date.now(),
-                read: false
-            };
-            
-            await db.ref(`audio_messages/${targetId}/${messageId}`).set(messageData);
-            await db.ref(`audio_messages/${currentUser.id}/${messageId}`).set(messageData);
-            
-            addLog(`✅ Аудио сообщение отправлено ${toLogin}!`, 'success');
-            
-        } catch(e) {
-            addLog(`❌ Ошибка загрузки: ${e.message}`, 'error');
-        }
-    }
-    
-    // ПРОСЛУШИВАНИЕ ВХОДЯЩИХ
-    function setupAudioListener() {
-        if (!currentUser) return;
-        
-        const audioRef = db.ref(`audio_messages/${currentUser.id}`);
-        audioRef.on('child_added', (snap) => {
-            const msg = snap.val();
-            if (!msg.read) {
-                addLog(`📨 НОВОЕ АУДИО СООБЩЕНИЕ от ${msg.fromLogin} (${Math.round(msg.size/1000)} KB)`, 'audio');
-                displayAudioMessage(msg, snap.key);
-                snap.ref.update({ read: true });
+        responseRef.once('value', async (snap) => {
+            clearTimeout(timeout);
+            const resp = snap.val();
+            if (resp && resp.accepted) {
+                addLog(`✅ ${targetLogin} принял звонок!`, 'success');
+                await startTalkSession();
+                await responseRef.remove();
+            } else if (resp && !resp.accepted) {
+                addLog(`❌ ${targetLogin} отклонил`, 'error');
+                endCall();
             }
         });
     }
     
-    function displayAudioMessage(msg, msgId) {
-        const container = document.getElementById('incomingAudio');
-        const existing = document.getElementById(`audio_${msgId}`);
-        if (existing) return;
+    // ========== СЛУШАЕМ ВХОДЯЩИЕ ЗВОНКИ ==========
+    function setupCallListener() {
+        db.ref(`call_requests/${currentUser.id}`).on('value', async (snap) => {
+            const data = snap.val();
+            if (data && data.from && !isCallActive && data.status === 'ringing') {
+                addLog(`📞 ВХОДЯЩИЙ ЗВОНОК от ${data.fromLogin}`, 'call');
+                const accept = confirm(`📞 Звонок от ${data.fromLogin}\nОтветить?`);
+                
+                if (accept) {
+                    await db.ref(`call_requests/${currentUser.id}/response`).set({ accepted: true });
+                    currentCallWith = { id: data.from, login: data.fromLogin };
+                    addLog(`✅ Принимаем звонок`, 'success');
+                    await startTalkSession();
+                } else {
+                    await db.ref(`call_requests/${currentUser.id}/response`).set({ accepted: false });
+                }
+                await snap.ref.remove();
+            }
+        });
+    }
+    
+    // ========== НАЧАЛО СЕССИИ ==========
+    async function startTalkSession() {
+        if (isCallActive) return;
+        isCallActive = true;
         
-        const div = document.createElement('div');
-        div.className = 'audio-message';
-        div.id = `audio_${msgId}`;
-        div.innerHTML = `
-            <strong>📣 ${msg.fromLogin}</strong>
-            <small>${new Date(msg.timestamp).toLocaleTimeString()}</small>
-            <audio controls src="${msg.url}" preload="auto"></audio>
-            <div style="display: flex; gap: 8px; margin-top: 8px;">
-                <button onclick="replyTo('${msg.fromLogin}')" style="padding:6px 12px; font-size:12px;">📝 Ответить</button>
-                <button onclick="deleteAudio('${msgId}')" style="padding:6px 12px; font-size:12px; background:#dc3545;">🗑️ Удалить</button>
-            </div>
-        `;
-        container.prepend(div);
+        document.getElementById('callStatus').className = 'status talking';
+        document.getElementById('callStatus').innerHTML = '🎙️ РАЗГОВОР АКТИВЕН';
+        document.getElementById('callBtn').style.display = 'none';
+        document.getElementById('endCallBtn').style.display = 'inline-block';
         
-        // Автоматическое воспроизведение (требует взаимодействия)
-        const audio = div.querySelector('audio');
-        const playOnInteraction = () => {
-            audio.play().catch(e => addLog(`⚠️ Автовоспроизведение: ${e.message}`, 'warn'));
-            document.body.removeEventListener('click', playOnInteraction);
-            document.body.removeEventListener('touchstart', playOnInteraction);
+        addLog(`🎤 Запуск микрофона и поштучная запись...`, 'success');
+        
+        // Запрашиваем микрофон
+        mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        
+        // Для уровня микрофона
+        audioContext = new AudioContext();
+        sourceNode = audioContext.createMediaStreamSource(mediaStream);
+        analyserNode = audioContext.createAnalyser();
+        analyserNode.fftSize = 256;
+        sourceNode.connect(analyserNode);
+        
+        function updateMicLevel() {
+            if (!isCallActive) return;
+            const dataArray = new Uint8Array(analyserNode.frequencyBinCount);
+            analyserNode.getByteTimeDomainData(dataArray);
+            let max = 0;
+            for (let i = 0; i < dataArray.length; i++) {
+                const v = (dataArray[i] - 128) / 128;
+                max = Math.max(max, Math.abs(v));
+            }
+            const level = Math.min(100, max * 100);
+            document.getElementById('micLevel').style.width = level + '%';
+            animationFrame = requestAnimationFrame(updateMicLevel);
+        }
+        updateMicLevel();
+        
+        // ЗАПИСЬ ПО 1 СЕКУНДЕ
+        startRecordingLoop();
+    }
+    
+    // ЦИКЛИЧЕСКАЯ ЗАПИСЬ
+    function startRecordingLoop() {
+        if (!isCallActive) return;
+        
+        const chunks = [];
+        const stream = mediaStream;
+        
+        const recorder = new MediaRecorder(stream);
+        recorder.ondataavailable = (e) => {
+            if (e.data.size > 0) {
+                chunks.push(e.data);
+            }
         };
-        document.body.addEventListener('click', playOnInteraction, { once: true });
-        document.body.addEventListener('touchstart', playOnInteraction, { once: true });
+        
+        recorder.onstop = async () => {
+            if (chunks.length === 0) return;
+            const blob = new Blob(chunks, { type: 'audio/webm' });
+            if (blob.size > 1000 && isCallActive && currentCallWith) {
+                addLog(`📤 Отправка фрагмента (${Math.round(blob.size/1000)}KB)`, 'audio');
+                await sendAudioFragment(blob);
+            }
+            // Следующая запись
+            if (isCallActive) {
+                setTimeout(() => startRecordingLoop(), 50);
+            }
+        };
+        
+        recorder.start();
+        setTimeout(() => {
+            if (recorder.state === 'recording') recorder.stop();
+        }, 950);
     }
     
-    function replyTo(login) {
-        document.getElementById('targetLogin').value = login;
-        addLog(`✏️ Готов ответить ${login}. Нажми "Начать запись"`, 'info');
+    // ОТПРАВКА ФРАГМЕНТА
+    async function sendAudioFragment(blob) {
+        if (!currentCallWith) return;
+        
+        const filename = `fragment_${Date.now()}_${Math.random()}.webm`;
+        const storageRef = storage.ref(`call_fragments/${currentCallWith.id}/${currentUser.id}/${filename}`);
+        
+        try {
+            await storageRef.put(blob);
+            const url = await storageRef.getDownloadURL();
+            
+            await db.ref(`call_fragments/${currentCallWith.id}/incoming`).push({
+                from: currentUser.id,
+                fromLogin: currentUser.login,
+                url: url,
+                timestamp: Date.now()
+            });
+        } catch(e) {
+            addLog(`❌ Ошибка отправки: ${e.message}`, 'error');
+        }
     }
     
-    async function deleteAudio(msgId) {
-        await db.ref(`audio_messages/${currentUser.id}/${msgId}`).remove();
-        document.getElementById(`audio_${msgId}`)?.remove();
-        addLog(`🗑️ Аудио сообщение удалено`, 'info');
+    // СЛУШАЕМ ВХОДЯЩИЕ ФРАГМЕНТЫ
+    function setupAudioListener() {
+        if (!currentUser) return;
+        
+        const fragmentsRef = db.ref(`call_fragments/${currentUser.id}/incoming`);
+        fragmentsRef.on('child_added', (snap) => {
+            const data = snap.val();
+            if (data && isCallActive) {
+                addLog(`📥 Получен фрагмент от ${data.fromLogin}`, 'audio');
+                playAudioFragment(data.url);
+                snap.ref.remove();
+            } else if (data && !isCallActive) {
+                snap.ref.remove();
+            }
+        });
     }
     
-    // Автовход
+    // ОЧЕРЕДЬ ВОСПРОИЗВЕДЕНИЯ
+    function playAudioFragment(url) {
+        playQueue.push(url);
+        if (!isPlaying) {
+            processQueue();
+        }
+    }
+    
+    async function processQueue() {
+        if (playQueue.length === 0) {
+            isPlaying = false;
+            return;
+        }
+        isPlaying = true;
+        const url = playQueue.shift();
+        const audio = new Audio(url);
+        audio.volume = 1.0;
+        
+        try {
+            await audio.play();
+            addLog(`🔊 Фрагмент воспроизведен`, 'success');
+            audio.onended = () => processQueue();
+        } catch(e) {
+            addLog(`⚠️ Ошибка воспроизведения: ${e.message}`, 'warn');
+            processQueue();
+        }
+    }
+    
+    // ЗАВЕРШЕНИЕ ЗВОНКА
+    async function endCall() {
+        addLog(`🔴 Завершение звонка...`);
+        isCallActive = false;
+        
+        if (recordingInterval) clearInterval(recordingInterval);
+        if (animationFrame) cancelAnimationFrame(animationFrame);
+        if (audioContext) await audioContext.close();
+        if (mediaStream) mediaStream.getTracks().forEach(t => t.stop());
+        
+        mediaStream = null;
+        audioContext = null;
+        analyserNode = null;
+        sourceNode = null;
+        playQueue = [];
+        isPlaying = false;
+        
+        if (currentCallWith) {
+            await db.ref(`call_requests/${currentCallWith.id}`).remove();
+            await db.ref(`call_requests/${currentUser.id}`).remove();
+        }
+        
+        currentCallWith = null;
+        document.getElementById('callStatus').className = 'status idle';
+        document.getElementById('callStatus').innerHTML = '⚪ Режим ожидания';
+        document.getElementById('callBtn').style.display = 'inline-block';
+        document.getElementById('endCallBtn').style.display = 'none';
+        document.getElementById('micLevel').style.width = '0%';
+        
+        addLog(`✅ Звонок завершен`, 'info');
+    }
+    
     const saved = localStorage.getItem('user');
     if (saved) {
         currentUser = JSON.parse(saved);
@@ -386,12 +469,8 @@
         afterLogin();
     }
     
-    addLog(`🚀 ТЕСТ АУДИО СООБЩЕНИЙ ЗАПУЩЕН`, 'success');
-    addLog(`📌 Инструкция:`, 'info');
-    addLog(`   1. Войдите как 111 (телефон) и 222 (компьютер)`, 'info');
-    addLog(`   2. Укажите кому отправить (логин)`, 'info');
-    addLog(`   3. Нажмите "Начать запись" -> скажите что-то -> "Остановить"`, 'info');
-    addLog(`   4. У собеседника появится аудио для прослушивания`, 'info');
+    addLog(`🚀 РАЦИЯ РЕЖИМ ЗАПУЩЕН`, 'success');
+    addLog(`📌 Секундные фрагменты записываются и отправляются автоматически`, 'info');
 </script>
 </body>
 </html>
