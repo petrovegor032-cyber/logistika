@@ -3,652 +3,114 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>AudioDisk - Мессенджер</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <title>AudioDisk - ТЕСТ ЗВОНКОВ</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
-            background: linear-gradient(135deg, #0a0a2a 0%, #1a1a3a 50%, #0a0a2a 100%);
-            color: white;
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-            position: relative;
-            overflow: hidden;
-        }
-        
-        #sparks-canvas {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-            z-index: 0;
-        }
-        
-        .header {
-            background: rgba(102, 126, 234, 0.3);
-            backdrop-filter: blur(12px);
-            padding: 16px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-            position: relative;
-            z-index: 10;
-        }
-        
-        .menu-btn {
-            background: rgba(255, 255, 255, 0.15);
-            backdrop-filter: blur(8px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            color: white;
-            font-size: 24px;
-            width: 44px;
-            height: 44px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-        }
-        
-        .page {
-            display: none;
-            flex: 1;
-            overflow-y: auto;
-            position: relative;
-            z-index: 10;
-            padding: 12px;
-        }
-        
-        .page.active { display: block; }
-        
-        #page-main { padding: 0; }
-        
-        .search {
-            padding: 12px;
-            margin-bottom: 12px;
-        }
-        
-        .search input {
-            width: 100%;
-            padding: 14px;
-            border-radius: 30px;
-            border: none;
-            background: rgba(255, 255, 255, 0.1);
-            color: white;
-            font-size: 16px;
-            outline: none;
-        }
-        
-        .contact-item {
-            display: flex;
-            align-items: center;
-            padding: 12px;
-            margin: 8px 12px;
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 16px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            cursor: pointer;
-            transition: all 0.3s;
-            position: relative;
-        }
-        
-        .contact-avatar {
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-right: 12px;
-            font-size: 24px;
-            position: relative;
-        }
-        
-        .online-indicator {
-            position: absolute;
-            bottom: 2px;
-            right: 2px;
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            background: #4CAF50;
-            border: 2px solid white;
-        }
-        
-        .chat-container {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
+            font-family: system-ui, sans-serif;
             background: linear-gradient(135deg, #0a0a2a, #1a1a3a);
-            z-index: 200;
-            flex-direction: column;
-        }
-        
-        .chat-container.active { display: flex; }
-        
-        .chat-header {
-            background: rgba(102, 126, 234, 0.3);
-            backdrop-filter: blur(12px);
-            padding: 16px;
-            display: flex;
-            align-items: center;
-            gap: 16px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-        }
-        
-        .messages {
-            flex: 1;
-            overflow-y: auto;
-            padding: 16px;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-        
-        .message {
-            max-width: 75%;
-            padding: 10px 14px;
-            border-radius: 18px;
-            word-wrap: break-word;
-        }
-        
-        .message.out {
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            align-self: flex-end;
-        }
-        
-        .message.in {
-            background: rgba(255, 255, 255, 0.1);
-            align-self: flex-start;
-        }
-        
-        .message-meta {
-            font-size: 10px;
-            opacity: 0.7;
-            margin-top: 4px;
-        }
-        
-        .bottom-panel {
-            display: flex;
-            gap: 8px;
-            padding: 12px;
-            background: rgba(0, 0, 0, 0.5);
-            backdrop-filter: blur(12px);
-            border-top: 1px solid rgba(255, 255, 255, 0.1);
-        }
-        
-        .message-input {
-            flex: 1;
-            padding: 12px;
-            border-radius: 30px;
-            border: none;
-            background: rgba(255, 255, 255, 0.1);
             color: white;
-            resize: none;
-            font-family: inherit;
-            outline: none;
+            min-height: 100vh;
+            padding: 20px;
         }
-        
-        .btn-icon {
-            width: 44px;
-            height: 44px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            border: none;
-            color: white;
-            font-size: 20px;
-            cursor: pointer;
-        }
-        
-        .btn-danger { background: #dc3545; }
-        .btn-success { background: #28a745; }
-        
-        #map {
-            height: 60vh;
-            width: 100%;
-            border-radius: 20px;
-            margin: 12px 0;
-        }
-        
-        .leaflet-control-attribution { display: none !important; }
-        
-        .modal {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.8);
-            backdrop-filter: blur(8px);
-            z-index: 300;
-            display: none;
-            align-items: center;
-            justify-content: center;
-        }
-        
-        .modal.active { display: flex; }
-        
-        .modal-content {
-            background: rgba(26, 26, 46, 0.95);
-            border-radius: 28px;
-            padding: 28px;
-            width: 90%;
-            max-width: 400px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            position: relative;
-            max-height: 80vh;
-            overflow-y: auto;
-        }
-        
-        .modal-close {
-            position: absolute;
-            top: 12px;
-            right: 16px;
-            font-size: 24px;
-            cursor: pointer;
-        }
-        
-        .modal input, .modal select, .modal textarea {
-            width: 100%;
-            padding: 14px;
-            margin: 12px 0;
-            border-radius: 16px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            background: rgba(255, 255, 255, 0.1);
-            color: white;
-            outline: none;
-        }
-        
-        .toast {
-            position: fixed;
-            bottom: 80px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(0,0,0,0.8);
-            backdrop-filter: blur(12px);
-            color: white;
-            padding: 10px 20px;
-            border-radius: 40px;
-            font-size: 14px;
-            z-index: 400;
-        }
-        
-        .ad-card {
-            background: rgba(255, 255, 255, 0.05);
-            padding: 12px;
-            margin: 8px 0;
-            border-radius: 16px;
-            cursor: pointer;
-        }
-        
-        .ad-card img {
-            max-width: 100%;
-            border-radius: 12px;
-            margin-top: 8px;
-        }
-        
-        .side-menu {
-            position: fixed;
-            top: 0;
-            left: -280px;
-            width: 280px;
-            height: 100vh;
-            background: rgba(26, 26, 46, 0.95);
-            backdrop-filter: blur(20px);
-            z-index: 500;
-            transition: left 0.3s ease;
-            border-right: 1px solid rgba(255, 255, 255, 0.2);
-            padding: 80px 20px 20px;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-        }
-        
-        .side-menu.active { left: 0; }
-        
-        .menu-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0,0,0,0.6);
-            z-index: 499;
-            display: none;
-        }
-        
-        .menu-overlay.active { display: block; }
-        
-        .menu-item {
-            padding: 16px;
-            margin: 8px 0;
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 16px;
-            cursor: pointer;
-            text-align: center;
-        }
-        
-        .menu-item.danger {
-            background: rgba(220, 53, 69, 0.3);
-            border: 1px solid rgba(220, 53, 69, 0.5);
-        }
-        
-        .my-location-btn {
-            position: absolute;
-            bottom: 20px;
-            right: 20px;
-            z-index: 1000;
-            background: rgba(0,0,0,0.6);
-            border: none;
-            border-radius: 50%;
-            width: 44px;
-            height: 44px;
-            font-size: 24px;
-            cursor: pointer;
-        }
-        
-        .icon-selector {
-            display: flex;
-            gap: 12px;
-            flex-wrap: wrap;
-            margin: 12px 0;
-            justify-content: center;
-        }
-        
-        .icon-option {
-            font-size: 32px;
-            cursor: pointer;
-            padding: 8px;
-            border-radius: 12px;
-            transition: all 0.3s;
-        }
-        
-        .icon-option.selected {
-            background: rgba(102,126,234,0.5);
-            transform: scale(1.1);
-        }
-        
-        .avatar-selector {
-            display: flex;
-            gap: 12px;
-            flex-wrap: wrap;
-            justify-content: center;
-            margin: 12px 0;
-        }
-        
-        .avatar-option {
-            font-size: 48px;
-            cursor: pointer;
-            padding: 8px;
-            border-radius: 50%;
-            transition: all 0.3s;
-        }
-        
-        .avatar-option.selected {
-            background: rgba(102,126,234,0.5);
-            transform: scale(1.1);
-        }
-        
-        .profile-header {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            margin-bottom: 20px;
-        }
-        
-        .profile-avatar {
-            font-size: 80px;
-            cursor: pointer;
-        }
-        
-        .status-post {
-            background: rgba(255,255,255,0.05);
-            border-radius: 16px;
-            padding: 12px;
-            margin: 8px 0;
-        }
-        
-        .audio-player { max-width: 200px; }
-        .message.out audio { display: block; max-width: 200px; }
-        .message.in audio { max-width: 200px; }
-        
-        .delete-contact {
-            background: none;
-            border: none;
-            color: #ff4444;
-            font-size: 20px;
-            cursor: pointer;
-            padding: 8px;
-            margin-left: 8px;
-        }
-        
-        .edit-contact {
-            background: none;
-            border: none;
-            color: #ffcc00;
-            font-size: 20px;
-            cursor: pointer;
-            padding: 8px;
-        }
-        
-        .contact-actions {
-            display: flex;
-            align-items: center;
-            gap: 4px;
-        }
-        
-        .message-image {
-            max-width: 200px;
-            max-height: 200px;
-            border-radius: 12px;
-            cursor: pointer;
-        }
-        
-        .message-video {
-            max-width: 200px;
-            border-radius: 12px;
-        }
-        
-        .message-file {
-            color: white;
-            text-decoration: none;
+        .container { max-width: 600px; margin: 0 auto; }
+        .card {
             background: rgba(255,255,255,0.1);
-            padding: 4px 8px;
-            border-radius: 8px;
-            display: inline-block;
+            border-radius: 24px;
+            padding: 20px;
+            margin: 16px 0;
+            backdrop-filter: blur(10px);
         }
+        button {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border: none;
+            color: white;
+            padding: 14px 24px;
+            border-radius: 40px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 8px 8px 0 0;
+        }
+        button.danger { background: #dc3545; }
+        button.success { background: #28a745; }
+        input, textarea {
+            width: 100%;
+            padding: 12px;
+            margin: 8px 0;
+            border-radius: 16px;
+            border: none;
+            background: rgba(255,255,255,0.1);
+            color: white;
+        }
+        .log {
+            background: #0a0a0a;
+            border-radius: 16px;
+            padding: 12px;
+            font-family: monospace;
+            font-size: 11px;
+            max-height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+        .status {
+            padding: 8px 12px;
+            border-radius: 20px;
+            margin: 8px 0;
+            font-size: 14px;
+        }
+        .status.active { background: #28a745; }
+        .status.inactive { background: #dc3545; }
+        .status.ringing { background: #ff9800; animation: pulse 1s infinite; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+        hr { margin: 16px 0; border-color: rgba(255,255,255,0.2); }
+        .peer { border-left: 3px solid #667eea; padding-left: 16px; margin: 12px 0; }
     </style>
 </head>
 <body>
-
-<canvas id="sparks-canvas"></canvas>
-
-<div class="header">
-    <button class="menu-btn" onclick="toggleMenu()">☰</button>
-    <h2>✨ AudioDisk</h2>
-</div>
-
-<div id="page-main" class="page active">
-    <div class="search"><input type="text" id="chatSearch" placeholder="🔍 Поиск чатов..."></div>
-    <div id="chatsList"></div>
-</div>
-
-<div id="page-map" class="page">
-    <div id="map"></div>
-    <button class="my-location-btn" onclick="goToMyLocation()">📍</button>
-    <div style="display: flex; gap: 8px; margin: 12px 0;">
-        <input type="text" id="adSearch" placeholder="🔍 Поиск объявлений..." style="flex:1; padding:12px; border-radius:30px; border:none; background:rgba(255,255,255,0.1); color:white;">
-        <button class="btn-icon" onclick="showAddAdModal()">➕</button>
-    </div>
-    <div id="adsList"></div>
-</div>
-
-<div id="page-contacts" class="page">
-    <div class="search"><input type="text" id="contactSearch" placeholder="🔍 Поиск контактов..."></div>
-    <button class="btn-icon" onclick="openAddContactModal()" style="width: 90%; margin: 12px auto; display: block;">➕ Добавить контакт</button>
-    <div id="contactsList"></div>
-</div>
-
-<div id="chatContainer" class="chat-container">
-    <div class="chat-header">
-        <button class="btn-icon" onclick="closeChat()" style="background:none;">←</button>
-        <div style="flex:1"><div id="chatName" style="font-weight:bold"></div><div id="chatLogin" style="font-size:11px"></div></div>
-        <button class="btn-icon" id="blockUserBtn" onclick="toggleBlockUser()">🚫</button>
-        <button class="btn-icon" id="deleteChatBtn" onclick="deleteChat()">🗑️</button>
-        <button class="btn-icon" onclick="startCall()">📞</button>
-        <button class="btn-icon btn-danger" id="endCallBtn" onclick="endCall()" style="display: none;">🔴</button>
-    </div>
-    <div class="messages" id="messages"></div>
-    <div class="bottom-panel">
-        <button class="btn-icon" onclick="selectFile()">📎</button>
-        <button class="btn-icon" id="recordBtn" onclick="toggleRecording()">🎤</button>
-        <textarea class="message-input" id="messageInput" placeholder="Сообщение" rows="1"></textarea>
-        <button class="btn-icon" onclick="sendMessage()">✏️</button>
-        <input type="file" id="fileInput" style="display:none" accept="*/*">
-    </div>
-</div>
-
-<div class="side-menu" id="sideMenu">
-    <div class="menu-item" onclick="showProfileModal(); closeMenu()">👤 Мой профиль</div>
-    <div class="menu-item" onclick="showMyAds(); closeMenu()">📋 Мои объявления</div>
-    <div class="menu-item" onclick="showStatusModal(); closeMenu()">📱 Мой статус</div>
-    <div class="menu-item" onclick="switchPage('main'); closeMenu();">💬 Чаты</div>
-    <div class="menu-item" onclick="switchPage('map'); closeMenu();">🗺️ Карта</div>
-    <div class="menu-item" onclick="switchPage('contacts'); closeMenu();">📞 Контакты</div>
-    <div class="menu-item" onclick="logout(); closeMenu()">🚪 Выйти</div>
-</div>
-<div class="menu-overlay" id="menuOverlay" onclick="closeMenu()"></div>
-
-<!-- Модалки -->
-<div id="authModal" class="modal">
-    <div class="modal-content">
-        <span class="modal-close" onclick="closeModal('authModal')">✕</span>
-        <h2 style="text-align:center">✨ AudioDisk</h2>
+<div class="container">
+    <h1>📞 ТЕСТ ЗВОНКОВ WebRTC</h1>
+    <p style="opacity:0.7;">Логирование всех шагов | Firebase + WebRTC</p>
+    
+    <!-- Авторизация -->
+    <div class="card" id="authPanel">
+        <h3>🔐 Авторизация</h3>
         <input type="text" id="loginInput" placeholder="Логин">
         <input type="password" id="passwordInput" placeholder="Пароль">
-        <div style="display: flex; gap: 12px;">
-            <button class="btn-icon" onclick="register()" style="flex:1; border-radius:30px;">Регистрация</button>
-            <button class="btn-icon" onclick="login()" style="flex:1; border-radius:30px;">Вход</button>
+        <button onclick="register()">Регистрация</button>
+        <button onclick="login()" class="success">Вход</button>
+    </div>
+    
+    <!-- Основная панель (видна после входа) -->
+    <div id="mainPanel" style="display:none;">
+        <div class="card">
+            <h3>👤 Вы: <span id="myLogin">-</span></h3>
+            <div id="callStatus" class="status inactive">⚪ Ожидание</div>
         </div>
-    </div>
-</div>
-
-<div id="profileModal" class="modal">
-    <div class="modal-content">
-        <span class="modal-close" onclick="closeModal('profileModal')">✕</span>
-        <h3>👤 Мой профиль</h3>
-        <div class="profile-header">
-            <div class="profile-avatar" id="profileAvatar" onclick="openAvatarSelector()">😎</div>
+        
+        <div class="card">
+            <h3>📞 Управление звонком</h3>
+            <input type="text" id="targetLogin" placeholder="Логин собеседника (например, 222)">
+            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                <button id="callBtn" onclick="startCall()">📞 ПОЗВОНИТЬ</button>
+                <button id="endCallBtn" onclick="endCall()" class="danger" style="display:none;">🔴 ЗАВЕРШИТЬ</button>
+            </div>
         </div>
-        <input type="text" id="profileName" placeholder="Ваше имя">
-        <button class="btn-icon" onclick="saveProfile()" style="width:100%">Сохранить</button>
-        <button class="menu-item danger" onclick="deleteAccount(); closeModal('profileModal')" style="margin-top: 16px;">⚠️ Удалить аккаунт</button>
-    </div>
-</div>
-
-<div id="avatarModal" class="modal">
-    <div class="modal-content">
-        <span class="modal-close" onclick="closeModal('avatarModal')">✕</span>
-        <h3>Выберите аватар</h3>
-        <div class="avatar-selector" id="avatarSelector">
-            <div class="avatar-option" onclick="selectAvatar('😎')">😎</div>
-            <div class="avatar-option" onclick="selectAvatar('👨')">👨</div>
-            <div class="avatar-option" onclick="selectAvatar('👩')">👩</div>
-            <div class="avatar-option" onclick="selectAvatar('🐶')">🐶</div>
-            <div class="avatar-option" onclick="selectAvatar('🐱')">🐱</div>
-            <div class="avatar-option" onclick="selectAvatar('🦊')">🦊</div>
-            <div class="avatar-option" onclick="selectAvatar('🐼')">🐼</div>
-            <div class="avatar-option" onclick="selectAvatar('🐸')">🐸</div>
+        
+        <div class="card">
+            <h3>📋 ДРУГИЕ ПОЛЬЗОВАТЕЛИ</h3>
+            <div id="usersList"></div>
         </div>
-    </div>
-</div>
-
-<div id="statusModal" class="modal">
-    <div class="modal-content">
-        <span class="modal-close" onclick="closeModal('statusModal')">✕</span>
-        <h3>📱 Мой статус</h3>
-        <textarea id="statusText" rows="3" placeholder="Текст статуса..."></textarea>
-        <input type="file" id="statusPhoto" accept="image/*">
-        <button class="btn-icon" onclick="postStatus()" style="width:100%; margin-top:12px;">📤 Опубликовать</button>
-        <div id="myStatusList" style="margin-top: 16px;"></div>
-    </div>
-</div>
-
-<div id="addContactModal" class="modal">
-    <div class="modal-content">
-        <span class="modal-close" onclick="closeModal('addContactModal')">✕</span>
-        <h3>➕ Добавить контакт</h3>
-        <input type="text" id="contactLoginInput" placeholder="Логин друга">
-        <button class="btn-icon" onclick="addContact()" style="width:100%; border-radius:30px;">Найти</button>
-    </div>
-</div>
-
-<div id="editContactModal" class="modal">
-    <div class="modal-content">
-        <span class="modal-close" onclick="closeModal('editContactModal')">✕</span>
-        <h3>✏️ Редактировать контакт</h3>
-        <input type="text" id="editContactName" placeholder="Новое имя">
-        <input type="text" id="editContactLogin" placeholder="Логин" readonly>
-        <button class="btn-icon" onclick="saveContactEdit()" style="width:100%">Сохранить</button>
-    </div>
-</div>
-
-<div id="addAdModal" class="modal">
-    <div class="modal-content">
-        <span class="modal-close" onclick="closeModal('addAdModal')">✕</span>
-        <h3>📢 Новое объявление</h3>
-        <div class="icon-selector" id="iconSelector">
-            <div class="icon-option" onclick="selectAdIcon('🚗')">🚗</div>
-            <div class="icon-option" onclick="selectAdIcon('🚚')">🚚</div>
-            <div class="icon-option" onclick="selectAdIcon('👍')">👍</div>
-            <div class="icon-option" onclick="selectAdIcon('🤝')">🤝</div>
-            <div class="icon-option" onclick="selectAdIcon('🚑')">🚑</div>
-            <div class="icon-option" onclick="selectAdIcon('🚨')">🚨</div>
-            <div class="icon-option" onclick="selectAdIcon('✈️')">✈️</div>
-            <div class="icon-option" onclick="selectAdIcon('🚢')">🚢</div>
-            <div class="icon-option" onclick="selectAdIcon('🚂')">🚂</div>
-            <div class="icon-option" onclick="selectAdIcon('🏍️')">🏍️</div>
-            <div class="icon-option" onclick="selectAdIcon('🚲')">🚲</div>
-            <div class="icon-option" onclick="selectAdIcon('🐎')">🐎</div>
-            <div class="icon-option" onclick="selectAdIcon('⛽')">⛽</div>
-            <div class="icon-option" onclick="selectAdIcon('🔧')">🔧</div>
-            <div class="icon-option" onclick="selectAdIcon('🛞')">🛞</div>
-            <div class="icon-option" onclick="selectAdIcon('🛒')">🛒</div>
-            <div class="icon-option" onclick="selectAdIcon('🏠')">🏠</div>
-            <div class="icon-option" onclick="selectAdIcon('💼')">💼</div>
-            <div class="icon-option" onclick="selectAdIcon('⚡')">⚡</div>
-            <div class="icon-option" onclick="selectAdIcon('📌')">📌</div>
+        
+        <div class="card">
+            <h3>📋 ЛОГ ВЫЗОВОВ</h3>
+            <button onclick="clearLog()">Очистить лог</button>
+            <div id="log" class="log"></div>
         </div>
-        <textarea id="adText" rows="3" placeholder="Текст объявления..."></textarea>
-        <input type="text" id="adPrice" placeholder="Цена (опционально)">
-        <input type="file" id="adPhoto" accept="image/*">
-        <button class="btn-icon" onclick="createAd()" style="width:100%">📢 Опубликовать</button>
-    </div>
-</div>
-
-<div id="myAdsModal" class="modal">
-    <div class="modal-content">
-        <span class="modal-close" onclick="closeModal('myAdsModal')">✕</span>
-        <h3>📋 Мои объявления</h3>
-        <button class="btn-icon" onclick="showAddAdModal(); closeModal('myAdsModal')" style="width:100%; margin-bottom:12px;">➕ Создать объявление</button>
-        <div id="myAdsList" style="max-height: 50vh; overflow-y: auto;"></div>
     </div>
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
 
 <script>
     // ========== FIREBASE ==========
@@ -662,887 +124,447 @@
     
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
-    const storage = firebase.storage();
     
     // ========== ПЕРЕМЕННЫЕ ==========
     let currentUser = null;
-    let contacts = [];
-    let chats = [];
-    let currentChat = null;
-    let map = null;
-    let markers = [];
-    let allAds = [];
-    let userMarker = null;
-    let selectedAdIcon = '📌';
-    let mediaRecorder = null;
-    let blockedUsers = [];
     let localStream = null;
     let peerConnection = null;
     let callActive = false;
+    let currentCallWith = null;
     
-    // ========== ИСКОРКИ ==========
-    function initSparks() {
-        const canvas = document.getElementById('sparks-canvas');
-        const ctx = canvas.getContext('2d');
-        const shapes = ['●', '○', '✧', '✦', '✤', '❖', '◈', '⊛', '⌾', '⊕', '⊗', '◉'];
-        
-        function resizeCanvas() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-        }
-        resizeCanvas();
-        window.addEventListener('resize', resizeCanvas);
-        
-        let sparks = [];
-        const colors = ['#ffd700', '#ff69b4', '#00ffff', '#ff6600', '#ff0066', '#66ff00', '#ffffff', '#cc99ff'];
-        
-        function createSpark() {
-            return {
-                x: Math.random() * canvas.width,
-                y: Math.random() * canvas.height,
-                radius: 8 + Math.random() * 20,
-                alpha: 0,
-                color: colors[Math.floor(Math.random() * colors.length)],
-                shape: shapes[Math.floor(Math.random() * shapes.length)],
-                life: 0,
-                maxLife: 100 + Math.random() * 150
-            };
-        }
-        
-        sparks = [];
-        
-        function scheduleSpawn() {
-            setTimeout(() => {
-                const count = 1 + Math.floor(Math.random() * 2);
-                for (let i = 0; i < count; i++) {
-                    sparks.push(createSpark());
-                }
-                scheduleSpawn();
-            }, 10000 + Math.random() * 20000);
-        }
-        
-        function draw() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
-            for (let i = 0; i < sparks.length; i++) {
-                const spark = sparks[i];
-                
-                if (spark.life < spark.maxLife) {
-                    spark.life++;
-                    const progress = spark.life / spark.maxLife;
-                    let alpha = Math.sin(Math.PI * progress);
-                    alpha = Math.max(0, Math.min(0.7, alpha));
-                    spark.alpha = alpha;
-                    const size = spark.radius * (0.6 + Math.sin(progress * Math.PI) * 0.4);
-                    
-                    if (spark.alpha > 0.05) {
-                        ctx.font = `${size}px "Segoe UI Emoji", "Apple Color Emoji", sans-serif`;
-                        ctx.textAlign = 'center';
-                        ctx.textBaseline = 'middle';
-                        ctx.shadowBlur = 12;
-                        ctx.shadowColor = spark.color;
-                        ctx.globalAlpha = spark.alpha;
-                        ctx.fillStyle = spark.color;
-                        ctx.fillText(spark.shape, spark.x, spark.y);
-                    }
-                } else {
-                    sparks.splice(i, 1);
-                    i--;
-                }
-            }
-            
-            ctx.globalAlpha = 1;
-            ctx.shadowBlur = 0;
-            requestAnimationFrame(draw);
-        }
-        
-        scheduleSpawn();
-        draw();
+    // Конфигурация STUN серверов
+    const configuration = {
+        iceServers: [
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' },
+            { urls: 'stun:stun2.l.google.com:19302' },
+            { urls: 'stun:stun3.l.google.com:19302' },
+            { urls: 'stun:stun4.l.google.com:19302' }
+        ]
+    };
+    
+    // ========== ЛОГГИРОВАНИЕ ==========
+    function addLog(msg, type = 'info') {
+        const logDiv = document.getElementById('log');
+        const time = new Date().toLocaleTimeString();
+        const colors = { info: '#aaa', success: '#4caf50', error: '#f44336', warn: '#ff9800', call: '#2196f3' };
+        const logEntry = `<div style="color: ${colors[type] || colors.info}; border-bottom:1px solid #222; padding:4px 0;">[${time}] ${msg}</div>`;
+        logDiv.innerHTML += logEntry;
+        logDiv.scrollTop = logDiv.scrollHeight;
+        console.log(`[${time}] ${msg}`);
     }
     
-    function showToast(msg) {
-        const toast = document.createElement('div');
-        toast.className = 'toast';
-        toast.textContent = msg;
-        document.body.appendChild(toast);
-        setTimeout(() => toast.remove(), 2000);
-    }
-    
-    function requestNotificationPermission() {
-        if ('Notification' in window) {
-            Notification.requestPermission();
-        }
-    }
-    
-    // ========== МЕНЮ ==========
-    function toggleMenu() {
-        document.getElementById('sideMenu').classList.toggle('active');
-        document.getElementById('menuOverlay').classList.toggle('active');
-    }
-    function closeMenu() {
-        document.getElementById('sideMenu').classList.remove('active');
-        document.getElementById('menuOverlay').classList.remove('active');
-    }
-    
-    function switchPage(page) {
-        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-        document.getElementById(`page-${page}`).classList.add('active');
-        if (page === 'map' && map) map.invalidateSize();
+    function clearLog() {
+        document.getElementById('log').innerHTML = '';
+        addLog('📋 Лог очищен');
     }
     
     // ========== АВТОРИЗАЦИЯ ==========
     async function register() {
         const login = document.getElementById('loginInput').value.trim();
         const password = document.getElementById('passwordInput').value.trim();
-        if (!login || !password) return showToast('Введите логин и пароль');
+        if (!login || !password) return addLog('Введите логин и пароль', 'error');
         
         const snapshot = await db.ref('users').orderByChild('login').equalTo(login).once('value');
-        if (snapshot.exists()) return showToast('Логин занят');
+        if (snapshot.exists()) return addLog('Логин занят', 'error');
         
         const userId = Date.now().toString();
         await db.ref(`users/${userId}`).set({
-            login, password: btoa(password), name: login, avatar: '😎', created_at: Date.now(), online: true
+            login, password: btoa(password), name: login, created_at: Date.now(), online: true
         });
         
-        currentUser = { id: userId, login, name: login, avatar: '😎' };
+        currentUser = { id: userId, login, name: login };
         localStorage.setItem('user', JSON.stringify(currentUser));
-        closeModal('authModal');
-        initMap();
-        loadData();
-        setupMessageListener();
-        showToast('Регистрация успешна!');
+        addLog(`✅ Регистрация: ${login} (ID: ${userId.substring(0,8)}...)`, 'success');
+        afterLogin();
     }
     
     async function login() {
         const login = document.getElementById('loginInput').value.trim();
         const password = document.getElementById('passwordInput').value.trim();
-        if (!login || !password) return showToast('Введите логин и пароль');
+        if (!login || !password) return addLog('Введите логин и пароль', 'error');
         
         const snapshot = await db.ref('users').orderByChild('login').equalTo(login).once('value');
-        if (!snapshot.exists()) return showToast('Пользователь не найден');
+        if (!snapshot.exists()) return addLog('Пользователь не найден', 'error');
         
         let userId, userData;
         snapshot.forEach(child => { userId = child.key; userData = child.val(); });
-        if (btoa(password) !== userData.password) return showToast('Неверный пароль');
+        if (btoa(password) !== userData.password) return addLog('Неверный пароль', 'error');
         
-        currentUser = { id: userId, login, name: userData.name, avatar: userData.avatar || '😎' };
+        currentUser = { id: userId, login, name: userData.name };
         localStorage.setItem('user', JSON.stringify(currentUser));
         await db.ref(`users/${userId}/online`).set(true);
-        closeModal('authModal');
-        initMap();
-        loadData();
-        setupMessageListener();
-        showToast('Добро пожаловать!');
+        addLog(`✅ Вход: ${login} (ID: ${userId.substring(0,8)}...)`, 'success');
+        afterLogin();
     }
     
-    function checkAuth() {
-        const saved = localStorage.getItem('user');
-        if (saved) {
-            currentUser = JSON.parse(saved);
-            db.ref(`users/${currentUser.id}/online`).set(true);
-            initMap();
-            loadData();
-            setupMessageListener();
-            requestNotificationPermission();
-        } else {
-            openModal('authModal');
-        }
+    async function afterLogin() {
+        document.getElementById('authPanel').style.display = 'none';
+        document.getElementById('mainPanel').style.display = 'block';
+        document.getElementById('myLogin').innerText = currentUser.login;
+        
+        addLog(`🔌 Инициализация WebRTC...`);
+        await loadUsers();
+        setupCallListener();
+        setupConnectionMonitor();
     }
     
     async function logout() {
         if (currentUser) await db.ref(`users/${currentUser.id}/online`).set(false);
-        if (peerConnection) endCall();
+        endCall();
         currentUser = null;
         localStorage.clear();
-        location.reload();
+        document.getElementById('authPanel').style.display = 'block';
+        document.getElementById('mainPanel').style.display = 'none';
+        addLog('👋 Выход выполнен');
     }
     
-    async function deleteAccount() {
-        if (!confirm('Вы уверены? Ваш аккаунт и все данные будут удалены безвозвратно!')) return;
-        await db.ref(`users/${currentUser.id}`).remove();
-        showToast('Аккаунт удалён');
-        logout();
-    }
-    
-    // ========== БЛОКИРОВКА ==========
-    async function loadBlockedUsers() {
-        const snapshot = await db.ref(`blocked/${currentUser.id}`).once('value');
-        blockedUsers = [];
-        if (snapshot.exists()) {
-            blockedUsers = Object.keys(snapshot.val());
-        }
-    }
-    
-    async function toggleBlockUser() {
-        if (!currentChat) return;
-        const isBlocked = blockedUsers.includes(currentChat.id);
-        
-        if (isBlocked) {
-            await db.ref(`blocked/${currentUser.id}/${currentChat.id}`).remove();
-            await db.ref(`blocked/${currentChat.id}/${currentUser.id}`).remove();
-            showToast(`✅ ${currentChat.name} разблокирован`);
-            document.getElementById('blockUserBtn').style.background = 'linear-gradient(135deg, #667eea, #764ba2)';
-        } else {
-            await db.ref(`blocked/${currentUser.id}/${currentChat.id}`).set(true);
-            await db.ref(`blocked/${currentChat.id}/${currentUser.id}`).set(true);
-            showToast(`🔒 ${currentChat.name} заблокирован`);
-            document.getElementById('blockUserBtn').style.background = '#dc3545';
-        }
-        await loadBlockedUsers();
-    }
-    
-    function isBlocked(userId) {
-        return blockedUsers.includes(userId);
-    }
-    
-    // ========== УДАЛЕНИЕ ЧАТА ==========
-    async function deleteChat() {
-        if (!currentChat) return;
-        if (!confirm(`Удалить чат с ${currentChat.name}? Сообщения будут удалены у вас.`)) return;
-        await db.ref(`messages/${currentUser.id}/${currentChat.id}`).remove();
-        showToast('Чат удалён');
-        closeChat();
-        loadChats();
-    }
-    
-    // ========== ПРОФИЛЬ ==========
-    function showProfileModal() {
-        document.getElementById('profileName').value = currentUser.name || currentUser.login;
-        document.getElementById('profileAvatar').innerHTML = currentUser.avatar || '😎';
-        openModal('profileModal');
-    }
-    
-    function openAvatarSelector() {
-        closeModal('profileModal');
-        openModal('avatarModal');
-    }
-    
-    function selectAvatar(avatar) {
-        currentUser.avatar = avatar;
-        document.getElementById('profileAvatar').innerHTML = avatar;
-        closeModal('avatarModal');
-        openModal('profileModal');
-    }
-    
-    async function saveProfile() {
-        const name = document.getElementById('profileName').value.trim() || currentUser.login;
-        await db.ref(`users/${currentUser.id}`).update({ name, avatar: currentUser.avatar });
-        currentUser.name = name;
-        localStorage.setItem('user', JSON.stringify(currentUser));
-        showToast('Профиль сохранен');
-        closeModal('profileModal');
-        loadContacts();
-        loadChats();
-    }
-    
-    // ========== СТАТУС ==========
-    async function postStatus() {
-        const text = document.getElementById('statusText').value.trim();
-        const photoFile = document.getElementById('statusPhoto').files[0];
-        let photoUrl = '';
-        
-        if (photoFile) {
-            const storageRef = storage.ref(`status/${currentUser.id}/${Date.now()}`);
-            await storageRef.put(photoFile);
-            photoUrl = await storageRef.getDownloadURL();
-        }
-        
-        if (!text && !photoUrl) return showToast('Введите текст или добавьте фото');
-        
-        await db.ref(`status/${currentUser.id}/${Date.now()}`).set({ text, photoUrl, timestamp: Date.now() });
-        showToast('Статус опубликован');
-        document.getElementById('statusText').value = '';
-        document.getElementById('statusPhoto').value = '';
-        loadMyStatus();
-    }
-    
-    async function loadMyStatus() {
-        const snapshot = await db.ref(`status/${currentUser.id}`).orderByChild('timestamp').limitToLast(10).once('value');
-        const statuses = [];
-        snapshot.forEach(child => statuses.push({ id: child.key, ...child.val() }));
-        
-        document.getElementById('myStatusList').innerHTML = statuses.map(s => `
-            <div class="status-post">
-                ${s.text ? `<p>${escapeHtml(s.text)}</p>` : ''}
-                ${s.photoUrl ? `<img src="${s.photoUrl}" style="max-width:100%; border-radius:12px;">` : ''}
-                <small>${new Date(s.timestamp).toLocaleString()}</small>
-            </div>
-        `).join('');
-    }
-    
-    function showStatusModal() {
-        loadMyStatus();
-        openModal('statusModal');
-    }
-    
-    // ========== КАРТА ==========
-    function initMap() {
-        if (map) return;
-        map = L.map('map').setView([55.751244, 37.618423], 13);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
-        
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(pos => {
-                const { latitude, longitude } = pos.coords;
-                userMarker = L.marker([latitude, longitude]).addTo(map);
-                map.setView([latitude, longitude], 15);
-            });
-        }
-    }
-    
-    function goToMyLocation() {
-        if (userMarker) {
-            const pos = userMarker.getLatLng();
-            map.setView([pos.lat, pos.lng], 15);
-            showToast('📍 Вы здесь');
-        } else {
-            showToast('Включите геолокацию');
-        }
-    }
-    
-    // ========== ОБЪЯВЛЕНИЯ ==========
-    function selectAdIcon(icon) {
-        selectedAdIcon = icon;
-        document.querySelectorAll('.icon-option').forEach(opt => opt.classList.remove('selected'));
-        if (event && event.target) event.target.classList.add('selected');
-    }
-    
-    async function createAd() {
-        const text = document.getElementById('adText').value.trim();
-        const price = document.getElementById('adPrice').value.trim();
-        if (!text) return showToast('Введите текст объявления');
-        if (!userMarker) return showToast('Включите геолокацию');
-        
-        const pos = userMarker.getLatLng();
-        let photoUrl = '';
-        const photoFile = document.getElementById('adPhoto').files[0];
-        if (photoFile) {
-            try {
-                const storageRef = storage.ref(`ads/${Date.now()}_${photoFile.name}`);
-                await storageRef.put(photoFile);
-                photoUrl = await storageRef.getDownloadURL();
-            } catch(e) { console.error(e); }
-        }
-        
-        await db.ref(`ads/${Date.now()}`).set({
-            icon: selectedAdIcon, text, price, photoUrl,
-            lat: pos.lat, lng: pos.lng,
-            userId: currentUser.id, userLogin: currentUser.login,
-            timestamp: Date.now()
+    // ========== ЗАГРУЗКА ПОЛЬЗОВАТЕЛЕЙ ==========
+    async function loadUsers() {
+        const snapshot = await db.ref('users').once('value');
+        let html = '';
+        snapshot.forEach(child => {
+            const user = child.val();
+            if (user.login !== currentUser.login) {
+                html += `<div class="peer">
+                    <strong>${user.login}</strong> (${user.name}) 
+                    <span style="color:${user.online ? '#4caf50' : '#888'}">● ${user.online ? 'онлайн' : 'офлайн'}</span>
+                    <button onclick="callTo('${user.login}')" style="padding:6px 12px; font-size:12px;">📞 Позвонить</button>
+                </div>`;
+            }
         });
-        
-        showToast('Объявление опубликовано');
-        closeModal('addAdModal');
-        document.getElementById('adText').value = '';
-        document.getElementById('adPrice').value = '';
-        document.getElementById('adPhoto').value = '';
-        await loadAds();
+        document.getElementById('usersList').innerHTML = html || '<div>Нет других пользователей</div>';
     }
     
-    async function loadAds() {
-        const snapshot = await db.ref('ads').once('value');
-        allAds = [];
-        if (snapshot.exists()) snapshot.forEach(child => allAds.push({ id: child.key, ...child.val() }));
-        renderAds();
+    function callTo(login) {
+        document.getElementById('targetLogin').value = login;
+        startCall();
     }
     
-    function renderAds() {
-        const search = document.getElementById('adSearch')?.value?.toLowerCase() || '';
-        let filtered = (allAds || []).filter(ad => ad && ad.text);
-        if (search) filtered = filtered.filter(ad => ad.text.toLowerCase().includes(search));
-        
-        document.getElementById('adsList').innerHTML = filtered.map(ad => `
-            <div class="ad-card" onclick="centerMapOnAd(${ad.lat}, ${ad.lng})">
-                <div style="display:flex; align-items:center; gap:8px;">
-                    <span style="font-size:32px;">${ad.icon || '📌'}</span>
-                    <div style="flex:1">
-                        <b>${escapeHtml(ad.text)}</b><br>
-                        ${ad.price ? `<small>💰 ${ad.price}₽</small><br>` : ''}
-                        <small>👤 ${escapeHtml(ad.userLogin)}</small>
-                    </div>
-                    ${ad.userId === currentUser?.id ? `<button onclick="event.stopPropagation(); deleteAd('${ad.id}')" style="background:none; border:none; font-size:20px;">🗑️</button>` : ''}
-                </div>
-                ${ad.photoUrl ? `<img src="${ad.photoUrl}" style="max-width:100%; border-radius:12px; margin-top:8px;">` : ''}
-                <button onclick="event.stopPropagation(); openChatFromAd('${ad.userId}')" style="margin-top:8px; background:rgba(102,126,234,0.5); border:none; padding:8px; border-radius:20px; color:white;">💬 Написать автору</button>
-            </div>
-        `).join('');
-        
-        if (map) {
-            markers.forEach(m => map.removeLayer(m));
-            markers = [];
-            filtered.forEach(ad => {
-                const marker = L.marker([ad.lat, ad.lng], {
-                    icon: L.divIcon({ html: `<div style="font-size:32px;">${ad.icon || '📌'}</div>`, iconSize: [35, 35] })
-                }).addTo(map);
-                marker.bindPopup(`<b>${escapeHtml(ad.text)}</b><br><button onclick="openChatFromAd('${ad.userId}')">💬 Написать</button>`);
-                markers.push(marker);
-            });
-        }
+    // ========== МОНИТОРИНГ СОЕДИНЕНИЯ ==========
+    function setupConnectionMonitor() {
+        db.ref('.info/connected').on('value', (snap) => {
+            addLog(`🔌 Firebase WebSocket: ${snap.val() ? 'ПОДКЛЮЧЕН ✅' : 'ОТКЛЮЧЕН ❌'}`, snap.val() ? 'success' : 'error');
+        });
     }
     
-    async function deleteAd(adId) {
-        if (confirm('Удалить объявление?')) {
-            await db.ref(`ads/${adId}`).remove();
-            await loadAds();
-            showToast('Объявление удалено');
-        }
-    }
-    
-    function centerMapOnAd(lat, lng) {
-        if (map) {
-            map.setView([lat, lng], 18);
-            showToast('📍 Объявление на карте');
-        }
-    }
-    
-    async function showMyAds() {
-        const myAds = allAds.filter(ad => ad.userId === currentUser.id);
-        document.getElementById('myAdsList').innerHTML = myAds.map(ad => `
-            <div class="ad-card">
-                <div style="display:flex; align-items:center; gap:8px;">
-                    <span style="font-size:32px;">${ad.icon || '📌'}</span>
-                    <div style="flex:1">
-                        <b>${escapeHtml(ad.text)}</b><br>
-                        ${ad.price ? `💰 ${ad.price}₽<br>` : ''}
-                        <small>⏱️ ${Math.floor((Date.now() - ad.timestamp) / 1000 / 60 / 60)} ч назад</small>
-                    </div>
-                    <button onclick="deleteAd('${ad.id}'); closeModal('myAdsModal')" style="background:none; border:none; font-size:20px;">🗑️</button>
-                </div>
-                ${ad.photoUrl ? `<img src="${ad.photoUrl}" style="max-width:100%; border-radius:12px; margin-top:8px;">` : ''}
-            </div>
-        `).join('');
-        if (myAds.length === 0) document.getElementById('myAdsList').innerHTML = '<div style="text-align:center">📭 Нет объявлений</div>';
-        openModal('myAdsModal');
-    }
-    
-    async function openChatFromAd(userId) {
-        const userSnap = await db.ref(`users/${userId}`).once('value');
-        const userData = userSnap.val();
-        if (!userData) return showToast('Пользователь не найден');
-        
-        const contact = { id: userId, login: userData.login, name: userData.name, avatar: userData.avatar || '👤' };
-        
-        const contactExists = await db.ref(`contacts/${currentUser.id}/${userId}`).once('value');
-        if (!contactExists.exists()) {
-            await db.ref(`contacts/${currentUser.id}/${userId}`).set({ name: userData.name, login: userData.login, added_at: Date.now() });
-            await loadContacts();
-        }
-        
-        switchPage('main');
-        openChat(contact);
-    }
-    
-    // ========== КОНТАКТЫ - ИСПРАВЛЕННАЯ ВЕРСИЯ ДЛЯ ТЕЛЕФОНА ==========
-    async function addContact() {
-        console.log('🟢 addContact() ВЫЗВАНА');
-        
-        const login = document.getElementById('contactLoginInput').value.trim();
-        console.log('1️⃣ Логин:', login);
-        
-        if (!login) {
-            showToast('Введите логин');
-            return;
-        }
-        
-        // Используем REST API вместо WebSocket (фикс для телефона)
-        const url = `https://audiozvonok-b340d-default-rtdb.firebaseio.com/users.json?orderBy="login"&equalTo="${login}"`;
-        console.log('2️⃣ URL:', url);
-        
-        try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 10000);
-            
-            const response = await fetch(url, { signal: controller.signal });
-            clearTimeout(timeoutId);
-            
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
-            }
-            
-            const data = await response.json();
-            console.log('3️⃣ Данные:', data);
-            
-            if (!data || Object.keys(data).length === 0) {
-                showToast('❌ Пользователь не найден');
-                return;
-            }
-            
-            let contactId = Object.keys(data)[0];
-            let contactData = data[contactId];
-            
-            if (contactId === currentUser.id) {
-                showToast('❌ Нельзя добавить себя');
-                return;
-            }
-            
-            // Проверяем существующий контакт
-            const checkUrl = `https://audiozvonok-b340d-default-rtdb.firebaseio.com/contacts/${currentUser.id}/${contactId}.json`;
-            const checkResponse = await fetch(checkUrl);
-            const existing = await checkResponse.json();
-            
-            if (existing) {
-                showToast('⚠️ Контакт уже существует');
-                closeModal('addContactModal');
-                return;
-            }
-            
-            // Добавляем контакт
-            const addUrl = `https://audiozvonok-b340d-default-rtdb.firebaseio.com/contacts/${currentUser.id}/${contactId}.json`;
-            const addResponse = await fetch(addUrl, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    name: contactData.name || login,
-                    login: login,
-                    added_at: Date.now()
-                })
-            });
-            
-            if (addResponse.ok) {
-                showToast(`✅ ${contactData.name || login} добавлен`);
-                closeModal('addContactModal');
-                document.getElementById('contactLoginInput').value = '';
-                await loadContacts();
-                await loadChats();
-            } else {
-                showToast('❌ Ошибка при добавлении');
-            }
-            
-        } catch(e) {
-            if (e.name === 'AbortError') {
-                showToast('❌ Таймаут соединения');
-            } else {
-                console.error('Ошибка:', e);
-                showToast('Ошибка: ' + e.message);
-            }
-        }
-    }
-    
-    async function loadContacts() {
-        const snapshot = await db.ref(`contacts/${currentUser.id}`).once('value');
-        contacts = [];
-        if (snapshot.exists()) {
-            for (const [id, data] of Object.entries(snapshot.val())) {
-                const userSnap = await db.ref(`users/${id}`).once('value');
-                const user = userSnap.val();
-                if (user) contacts.push({ id, login: user.login, name: data.name || user.login, avatar: user.avatar || '👤' });
-            }
-        }
-        renderContacts();
-    }
-    
-    async function deleteContact(contactId, event) {
-        event.stopPropagation();
-        if (!confirm('Удалить контакт?')) return;
-        await db.ref(`contacts/${currentUser.id}/${contactId}`).remove();
-        showToast('Контакт удалён');
-        await loadContacts();
-        await loadChats();
-    }
-    
-    function editContact(contact, event) {
-        event.stopPropagation();
-        document.getElementById('editContactName').value = contact.name;
-        document.getElementById('editContactLogin').value = contact.login;
-        window.editContactId = contact.id;
-        openModal('editContactModal');
-    }
-    
-    async function saveContactEdit() {
-        const newName = document.getElementById('editContactName').value.trim();
-        const contactId = window.editContactId;
-        if (!newName) return;
-        await db.ref(`contacts/${currentUser.id}/${contactId}/name`).set(newName);
-        showToast('Контакт переименован');
-        closeModal('editContactModal');
-        await loadContacts();
-        await loadChats();
-    }
-    
-    function renderContacts() {
-        const search = document.getElementById('contactSearch')?.value?.toLowerCase() || '';
-        const filtered = contacts.filter(c => c.name.toLowerCase().includes(search));
-        document.getElementById('contactsList').innerHTML = filtered.map(c => `
-            <div class="contact-item" onclick='openChat(${JSON.stringify(c).replace(/"/g, '&quot;')})'>
-                <div class="contact-avatar">${c.avatar}<span class="online-indicator"></span></div>
-                <div style="flex:1">
-                    <b>${escapeHtml(c.name)}</b><br>
-                    <small>@${c.login}</small>
-                </div>
-                <div class="contact-actions">
-                    <button class="edit-contact" onclick="editContact(${JSON.stringify(c).replace(/"/g, '&quot;')}, event)">✏️</button>
-                    <button class="delete-contact" onclick="deleteContact('${c.id}', event)">🗑️</button>
-                </div>
-            </div>
-        `).join('');
-    }
-    
-    // ========== ЧАТЫ ==========
-    function setupMessageListener() {
+    // ========== ОСНОВНАЯ ЛОГИКА ЗВОНКОВ ==========
+    function setupCallListener() {
         if (!currentUser) return;
         
-        db.ref(`messages/${currentUser.id}`).on('child_added', async (snap) => {
-            const contactId = snap.key;
-            const contact = contacts.find(c => c.id === contactId);
-            
-            if (contact && !isBlocked(contactId)) {
-                const msgs = snap.val();
-                const lastMsg = Object.values(msgs).sort((a, b) => b.timestamp - a.timestamp)[0];
-                if (lastMsg && lastMsg.from !== currentUser.id) {
-                    showToast(`📨 ${contact.name}: ${lastMsg.content?.substring(0, 50) || 'Файл'}`);
+        addLog(`📡 Слушаю входящие звонки в /calls/${currentUser.id}/offer`);
+        
+        const offerRef = db.ref(`calls/${currentUser.id}/offer`);
+        offerRef.on('value', async (snap) => {
+            const offerData = snap.val();
+            if (offerData && !callActive && offerData.from !== currentUser.id) {
+                addLog(`📞 ВХОДЯЩИЙ ЗВОНОК от ${offerData.fromLogin || offerData.from}`, 'call');
+                
+                const answer = confirm(`📞 Входящий звонок от ${offerData.fromLogin || offerData.from}\nОтветить?`);
+                
+                if (answer) {
+                    addLog(`✅ Принимаем звонок от ${offerData.fromLogin || offerData.from}`, 'success');
+                    await acceptCall(offerData.from, offerData.offer);
+                    await offerRef.remove();
+                } else {
+                    addLog(`❌ Отклонен звонок от ${offerData.fromLogin || offerData.from}`, 'error');
+                    await offerRef.remove();
                 }
-            }
-            
-            await loadChats();
-            if (currentChat && contactId === currentChat.id && !isBlocked(contactId)) {
-                loadMessages();
             }
         });
-    }
-    
-    async function loadChats() {
-        await loadBlockedUsers();
         
-        const snapshot = await db.ref(`messages/${currentUser.id}`).once('value');
-        chats = [];
-        if (snapshot.exists()) {
-            for (const [contactId, msgs] of Object.entries(snapshot.val())) {
-                const contact = contacts.find(c => c.id === contactId);
-                if (contact && !isBlocked(contactId)) {
-                    const lastMsg = Object.values(msgs).sort((a, b) => b.timestamp - a.timestamp)[0];
-                    chats.push({ contact, lastMsg });
+        // Автоматическая очистка старых offer (более 30 секунд)
+        setInterval(async () => {
+            const snapshot = await offerRef.once('value');
+            if (snapshot.exists()) {
+                const data = snapshot.val();
+                if (data.timestamp && Date.now() - data.timestamp > 30000) {
+                    await offerRef.remove();
+                    addLog('🧹 Очищен старый offer (таймаут 30с)', 'warn');
                 }
             }
-        }
-        chats.sort((a, b) => b.lastMsg.timestamp - a.lastMsg.timestamp);
-        renderChats();
+        }, 10000);
     }
     
-    function renderChats() {
-        const search = document.getElementById('chatSearch')?.value?.toLowerCase() || '';
-        const filtered = chats.filter(c => c.contact.name.toLowerCase().includes(search));
-        document.getElementById('chatsList').innerHTML = filtered.map(c => `
-            <div class="contact-item" onclick='openChat(${JSON.stringify(c.contact).replace(/"/g, '&quot;')})'>
-                <div class="contact-avatar">${c.contact.avatar}<span class="online-indicator"></span></div>
-                <div style="flex:1">
-                    <b>${escapeHtml(c.contact.name)}</b><br>
-                    <small>${c.lastMsg.type === 'text' ? (c.lastMsg.content || '').substring(0, 30) : '📎 Вложение'}</small>
-                </div>
-                <small>${new Date(c.lastMsg.timestamp).toLocaleTimeString()}</small>
-            </div>
-        `).join('');
-    }
-    
-    function openChat(contact) {
-        if (!contact) return;
-        if (isBlocked(contact.id)) {
-            showToast(`🔒 ${contact.name} заблокирован`);
+    async function startCall() {
+        if (!currentUser) {
+            addLog('❌ Сначала войдите', 'error');
             return;
         }
         
-        currentChat = contact;
-        document.getElementById('chatName').innerText = contact.name;
-        document.getElementById('chatLogin').innerText = '@' + contact.login;
-        
-        const isBlockedUser = blockedUsers.includes(contact.id);
-        document.getElementById('blockUserBtn').style.background = isBlockedUser ? '#dc3545' : 'linear-gradient(135deg, #667eea, #764ba2)';
-        
-        document.getElementById('chatContainer').classList.add('active');
-        
-        if (window.chatListenerRef) window.chatListenerRef.off();
-        window.chatListenerRef = db.ref(`messages/${currentUser.id}/${contact.id}`);
-        window.chatListenerRef.on('child_added', () => {
-            if (!isBlocked(contact.id)) loadMessages();
-        });
-        
-        loadMessages();
-    }
-    
-    function closeChat() {
-        if (window.chatListenerRef) {
-            window.chatListenerRef.off();
-            window.chatListenerRef = null;
-        }
-        if (peerConnection) endCall();
-        currentChat = null;
-        document.getElementById('chatContainer').classList.remove('active');
-    }
-    
-    async function loadMessages() {
-        if (!currentChat || isBlocked(currentChat.id)) {
-            document.getElementById('messages').innerHTML = '<div style="text-align:center; padding:40px;">💬 Чат недоступен</div>';
+        const targetLogin = document.getElementById('targetLogin').value.trim();
+        if (!targetLogin) {
+            addLog('❌ Введите логин собеседника', 'error');
             return;
         }
         
-        const snapshot = await db.ref(`messages/${currentUser.id}/${currentChat.id}`).orderByKey().limitToLast(50).once('value');
-        const messages = [];
-        snapshot.forEach(child => {
-            messages.push({ id: child.key, ...child.val() });
-        });
-        messages.sort((a, b) => a.timestamp - b.timestamp);
-        
-        const container = document.getElementById('messages');
-        if (messages.length === 0) {
-            container.innerHTML = '<div style="text-align:center; padding:40px;">💬 Нет сообщений</div>';
-        } else {
-            container.innerHTML = messages.map(msg => `
-                <div class="message ${msg.from === currentUser.id ? 'out' : 'in'}">
-                    <div>${msg.type === 'text' ? escapeHtml(msg.content) : 
-                         msg.type === 'audio' ? `<audio controls src="${msg.content}" class="audio-player"></audio>` :
-                         msg.type === 'photo' ? `<img src="${msg.content}" class="message-image" onclick="window.open('${msg.content}','_blank')">` :
-                         msg.type === 'file' ? `<a href="${msg.content}" download="${msg.name}" class="message-file">📎 ${escapeHtml(msg.name)}</a>` : msg.content}</div>
-                    <div class="message-meta">${msg.from === currentUser.id ? 'Вы' : currentChat.name} • ${new Date(msg.timestamp).toLocaleTimeString()}</div>
-                </div>
-            `).join('');
-        }
-        container.scrollTop = container.scrollHeight;
-    }
-    
-    async function sendMessage() {
-        const text = document.getElementById('messageInput').value.trim();
-        if (!text || !currentChat || isBlocked(currentChat.id)) return;
-        
-        const contactExists = await db.ref(`contacts/${currentUser.id}/${currentChat.id}`).once('value');
-        if (!contactExists.exists()) {
-            const userSnap = await db.ref(`users/${currentChat.id}`).once('value');
-            const userData = userSnap.val();
-            if (userData) {
-                await db.ref(`contacts/${currentUser.id}/${currentChat.id}`).set({
-                    name: userData.name || currentChat.name,
-                    login: userData.login,
-                    added_at: Date.now()
-                });
-                showToast(`✅ ${userData.name} добавлен в контакты`);
-                await loadContacts();
-            }
+        if (callActive) {
+            addLog('❌ Звонок уже активен', 'warn');
+            return;
         }
         
-        const msgId = Date.now().toString();
-        const msgData = {
-            from: currentUser.id,
-            to: currentChat.id,
-            type: 'text',
-            content: text,
-            timestamp: Date.now()
-        };
+        addLog(`🔍 Ищем пользователя ${targetLogin}...`);
         
-        await Promise.all([
-            db.ref(`messages/${currentChat.id}/${currentUser.id}/${msgId}`).set(msgData),
-            db.ref(`messages/${currentUser.id}/${currentChat.id}/${msgId}`).set(msgData)
-        ]);
+        const snapshot = await db.ref('users').orderByChild('login').equalTo(targetLogin).once('value');
+        if (!snapshot.exists()) {
+            addLog(`❌ Пользователь ${targetLogin} не найден`, 'error');
+            return;
+        }
         
-        document.getElementById('messageInput').value = '';
-        await loadMessages();
-        await loadChats();
-    }
-    
-    function selectFile() { document.getElementById('fileInput').click(); }
-    
-    document.getElementById('fileInput').onchange = async (e) => {
-        const file = e.target.files[0];
-        if (!file || !currentChat || isBlocked(currentChat.id)) return;
+        let targetId, targetData;
+        snapshot.forEach(child => { targetId = child.key; targetData = child.val(); });
         
-        const reader = new FileReader();
-        reader.onload = async (ev) => {
-            const msgId = Date.now().toString();
-            const msgData = {
+        addLog(`✅ Найден: ${targetData.login} (ID: ${targetId.substring(0,8)}...), онлайн: ${targetData.online ? 'да' : 'нет'}`, 'success');
+        
+        if (!targetData.online) {
+            addLog(`⚠️ ${targetLogin} не в сети! Звонок может не пройти.`, 'warn');
+        }
+        
+        currentCallWith = { id: targetId, login: targetLogin };
+        
+        try {
+            addLog(`🎤 Запрашиваем доступ к микрофону...`);
+            localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            addLog(`✅ Микрофон доступен`, 'success');
+            
+            addLog(`🔧 Создаем RTCPeerConnection...`);
+            peerConnection = new RTCPeerConnection(configuration);
+            
+            localStream.getTracks().forEach(track => {
+                peerConnection.addTrack(track, localStream);
+                addLog(`➕ Добавлен трек: ${track.kind}`);
+            });
+            
+            peerConnection.onicecandidate = (event) => {
+                if (event.candidate) {
+                    addLog(`🧊 ICE кандидат: ${event.candidate.type} (${event.candidate.candidate.substring(0, 50)}...)`);
+                    db.ref(`calls/${targetId}/candidates`).push({
+                        candidate: {
+                            candidate: event.candidate.candidate,
+                            sdpMid: event.candidate.sdpMid,
+                            sdpMLineIndex: event.candidate.sdpMLineIndex
+                        },
+                        from: currentUser.id,
+                        fromLogin: currentUser.login,
+                        timestamp: Date.now()
+                    });
+                }
+            };
+            
+            peerConnection.ontrack = (event) => {
+                addLog(`📡 ПОЛУЧЕН АУДИОПОТОК от собеседника!`, 'success');
+                const audio = new Audio();
+                audio.srcObject = event.streams[0];
+                audio.play().catch(e => addLog(`⚠️ Автовоспроизведение заблокировано: ${e.message}`, 'warn'));
+                document.getElementById('callStatus').className = 'status active';
+                document.getElementById('callStatus').innerHTML = '🟢 ЗВОНОК АКТИВЕН';
+                callActive = true;
+                document.getElementById('callBtn').style.display = 'none';
+                document.getElementById('endCallBtn').style.display = 'inline-block';
+                addLog(`🔊 Звонок установлен! Говорите.`, 'success');
+            };
+            
+            peerConnection.onconnectionstatechange = () => {
+                addLog(`🔗 Состояние соединения: ${peerConnection.connectionState}`, 'info');
+                if (peerConnection.connectionState === 'connected') {
+                    addLog(`✅ Соединение установлено!`, 'success');
+                } else if (peerConnection.connectionState === 'failed') {
+                    addLog(`❌ Соединение не удалось (возможно нужен TURN сервер)`, 'error');
+                    endCall();
+                } else if (peerConnection.connectionState === 'disconnected') {
+                    addLog(`⚠️ Соединение разорвано`, 'warn');
+                    endCall();
+                }
+            };
+            
+            peerConnection.oniceconnectionstatechange = () => {
+                addLog(`🧊 ICE состояние: ${peerConnection.iceConnectionState}`, 'info');
+            };
+            
+            addLog(`📡 Создаем Offer...`);
+            const offer = await peerConnection.createOffer();
+            await peerConnection.setLocalDescription(offer);
+            addLog(`✅ Offer создан, отправляем...`);
+            
+            const offerData = {
+                offer: { type: offer.type, sdp: offer.sdp },
                 from: currentUser.id,
-                to: currentChat.id,
-                type: 'file',
-                name: file.name,
-                content: ev.target.result,
+                fromLogin: currentUser.login,
                 timestamp: Date.now()
             };
-            await Promise.all([
-                db.ref(`messages/${currentChat.id}/${currentUser.id}/${msgId}`).set(msgData),
-                db.ref(`messages/${currentUser.id}/${currentChat.id}/${msgId}`).set(msgData)
-            ]);
-            await loadMessages();
-        };
-        reader.readAsDataURL(file);
-        document.getElementById('fileInput').value = '';
-    };
-    
-    async function toggleRecording() {
-        if (mediaRecorder && mediaRecorder.state === 'recording') {
-            mediaRecorder.stop();
-            document.getElementById('recordBtn').style.background = 'linear-gradient(135deg, #667eea, #764ba2)';
-        } else {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                mediaRecorder = new MediaRecorder(stream);
-                const chunks = [];
-                mediaRecorder.ondataavailable = e => chunks.push(e.data);
-                mediaRecorder.onstop = async () => {
-                    const blob = new Blob(chunks, { type: 'audio/webm' });
-                    const reader = new FileReader();
-                    reader.onload = async () => {
-                        if (!currentChat || isBlocked(currentChat.id)) return;
-                        const msgId = Date.now().toString();
-                        const msgData = { from: currentUser.id, to: currentChat.id, type: 'audio', content: reader.result, timestamp: Date.now() };
-                        await Promise.all([
-                            db.ref(`messages/${currentChat.id}/${currentUser.id}/${msgId}`).set(msgData),
-                            db.ref(`messages/${currentUser.id}/${currentChat.id}/${msgId}`).set(msgData)
-                        ]);
-                        await loadMessages();
-                    };
-                    reader.readAsDataURL(blob);
-                    stream.getTracks().forEach(t => t.stop());
-                };
-                mediaRecorder.start();
-                document.getElementById('recordBtn').style.background = '#dc3545';
-                setTimeout(() => { if (mediaRecorder?.state === 'recording') toggleRecording(); }, 30000);
-            } catch(e) { showToast('Нет доступа к микрофону'); }
+            await db.ref(`calls/${targetId}/offer`).set(offerData);
+            addLog(`✅ Offer отправлен в /calls/${targetId}/offer`, 'success');
+            
+            document.getElementById('callStatus').className = 'status ringing';
+            document.getElementById('callStatus').innerHTML = '📞 ЗВОНИМ... Ожидаем ответа';
+            document.getElementById('callBtn').style.display = 'none';
+            
+            // Ожидание ответа
+            const answerRef = db.ref(`calls/${currentUser.id}/answer`);
+            const timeout = setTimeout(() => {
+                if (!callActive) {
+                    addLog(`⏰ Таймаут: собеседник не ответил за 30 секунд`, 'warn');
+                    endCall();
+                }
+            }, 30000);
+            
+            answerRef.once('value', async (snap) => {
+                clearTimeout(timeout);
+                const answerData = snap.val();
+                if (answerData && !callActive && peerConnection) {
+                    addLog(`📡 Получен Answer, устанавливаем удаленное описание...`);
+                    const answer = new RTCSessionDescription({
+                        type: answerData.answer.type,
+                        sdp: answerData.answer.sdp
+                    });
+                    await peerConnection.setRemoteDescription(answer);
+                    await answerRef.remove();
+                    addLog(`✅ Answer применен`, 'success');
+                    
+                    // Подписываемся на ICE кандидаты от собеседника
+                    const candidatesRef = db.ref(`calls/${currentUser.id}/candidates`);
+                    candidatesRef.on('child_added', async (candSnap) => {
+                        if (peerConnection && candSnap.val().from !== currentUser.id) {
+                            const candData = candSnap.val().candidate;
+                            const candidate = new RTCIceCandidate({
+                                candidate: candData.candidate,
+                                sdpMid: candData.sdpMid,
+                                sdpMLineIndex: candData.sdpMLineIndex
+                            });
+                            await peerConnection.addIceCandidate(candidate);
+                            addLog(`🧊 Добавлен удаленный ICE кандидат`);
+                        }
+                    });
+                }
+            });
+            
+        } catch(e) {
+            addLog(`❌ Ошибка звонка: ${e.message}`, 'error');
+            endCall();
         }
     }
     
-    // ========== ЗВОНКИ (упрощенно для стабильности) ==========
-    function setupCallListener() {
-        // Упрощено для стабильности на телефонах
-    }
-    
-    function startCall() {
-        showToast('📞 Функция звонков в разработке');
+    async function acceptCall(fromUserId, offer) {
+        try {
+            addLog(`🎤 Запрашиваем микрофон для ответа...`);
+            localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            addLog(`✅ Микрофон получен`, 'success');
+            
+            peerConnection = new RTCPeerConnection(configuration);
+            
+            localStream.getTracks().forEach(track => {
+                peerConnection.addTrack(track, localStream);
+            });
+            
+            peerConnection.ontrack = (event) => {
+                addLog(`📡 ПОЛУЧЕН АУДИОПОТОК от звонящего!`, 'success');
+                const audio = new Audio();
+                audio.srcObject = event.streams[0];
+                audio.play().catch(e => addLog(`⚠️ Автовоспроизведение: ${e.message}`, 'warn'));
+                callActive = true;
+                document.getElementById('callStatus').className = 'status active';
+                document.getElementById('callStatus').innerHTML = '🟢 ЗВОНОК АКТИВЕН';
+                document.getElementById('callBtn').style.display = 'none';
+                document.getElementById('endCallBtn').style.display = 'inline-block';
+                addLog(`🔊 Разговор начат!`, 'success');
+            };
+            
+            peerConnection.onicecandidate = (event) => {
+                if (event.candidate) {
+                    db.ref(`calls/${fromUserId}/candidates`).push({
+                        candidate: {
+                            candidate: event.candidate.candidate,
+                            sdpMid: event.candidate.sdpMid,
+                            sdpMLineIndex: event.candidate.sdpMLineIndex
+                        },
+                        from: currentUser.id,
+                        fromLogin: currentUser.login,
+                        timestamp: Date.now()
+                    });
+                }
+            };
+            
+            peerConnection.onconnectionstatechange = () => {
+                addLog(`🔗 Состояние: ${peerConnection.connectionState}`);
+                if (peerConnection.connectionState === 'failed' || peerConnection.connectionState === 'disconnected') {
+                    endCall();
+                }
+            };
+            
+            addLog(`📡 Устанавливаем удаленное описание (Offer)...`);
+            await peerConnection.setRemoteDescription(new RTCSessionDescription({
+                type: offer.type,
+                sdp: offer.sdp
+            }));
+            
+            addLog(`📡 Создаем Answer...`);
+            const answer = await peerConnection.createAnswer();
+            await peerConnection.setLocalDescription(answer);
+            
+            await db.ref(`calls/${fromUserId}/answer`).set({
+                answer: { type: answer.type, sdp: answer.sdp },
+                from: currentUser.id,
+                fromLogin: currentUser.login,
+                timestamp: Date.now()
+            });
+            
+            addLog(`✅ Answer отправлен`, 'success');
+            
+            // ICE кандидаты от звонящего
+            const candidatesRef = db.ref(`calls/${currentUser.id}/candidates`);
+            candidatesRef.on('child_added', async (snap) => {
+                if (peerConnection && snap.val().from !== currentUser.id) {
+                    const candData = snap.val().candidate;
+                    const candidate = new RTCIceCandidate({
+                        candidate: candData.candidate,
+                        sdpMid: candData.sdpMid,
+                        sdpMLineIndex: candData.sdpMLineIndex
+                    });
+                    await peerConnection.addIceCandidate(candidate);
+                }
+            });
+            
+        } catch(e) {
+            addLog(`❌ Ошибка принятия звонка: ${e.message}`, 'error');
+            endCall();
+        }
     }
     
     function endCall() {
-        if (peerConnection) peerConnection.close();
-        if (localStream) localStream.getTracks().forEach(t => t.stop());
+        addLog(`🔴 Завершение звонка...`);
+        
+        if (peerConnection) {
+            peerConnection.close();
+            peerConnection = null;
+        }
+        if (localStream) {
+            localStream.getTracks().forEach(track => track.stop());
+            localStream = null;
+        }
+        
         callActive = false;
+        currentCallWith = null;
+        
+        document.getElementById('callStatus').className = 'status inactive';
+        document.getElementById('callStatus').innerHTML = '⚪ Ожидание';
+        document.getElementById('callBtn').style.display = 'inline-block';
         document.getElementById('endCallBtn').style.display = 'none';
-        document.getElementById('callBtn').style.display = 'flex';
+        
+        addLog(`✅ Звонок завершен`, 'info');
     }
     
-    // ========== UI ==========
-    function openModal(id) { document.getElementById(id).classList.add('active'); }
-    function closeModal(id) { document.getElementById(id).classList.remove('active'); }
-    function showAddAdModal() { openModal('addAdModal'); }
-    function openAddContactModal() { openModal('addContactModal'); }
-    function escapeHtml(str) { return str?.replace(/[&<>]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[m]) || ''; }
-    
-    async function loadData() {
-        if (!currentUser) return;
-        await loadBlockedUsers();
-        await loadContacts();
-        await loadChats();
-        await loadAds();
+    // Автозагрузка при сохраненной сессии
+    const saved = localStorage.getItem('user');
+    if (saved) {
+        currentUser = JSON.parse(saved);
         db.ref(`users/${currentUser.id}/online`).set(true);
-        setInterval(() => {
-            if (currentUser) db.ref(`users/${currentUser.id}/online`).set(true);
-        }, 30000);
+        afterLogin();
     }
     
-    document.getElementById('messageInput')?.addEventListener('input', function() {
-        this.style.height = 'auto';
-        this.style.height = Math.min(this.scrollHeight, 120) + 'px';
-    });
-    
-    document.getElementById('chatSearch')?.addEventListener('input', () => renderChats());
-    document.getElementById('contactSearch')?.addEventListener('input', () => renderContacts());
-    document.getElementById('adSearch')?.addEventListener('input', () => renderAds());
-    
-    initSparks();
-    checkAuth();
+    addLog(`🚀 ТЕСТОВЫЙ КЛИЕНТ ЗАПУЩЕН`, 'success');
+    addLog(`📌 Для теста: открой эту же страницу в двух браузерах/устройствах`, 'info');
+    addLog(`📌 Войди как 222 на одном, как 111 на другом`, 'info');
+    addLog(`📌 Нажми ПОЗВОНИТЬ - увидишь полный лог WebRTC`, 'call');
 </script>
 </body>
 </html>
