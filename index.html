@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>AudioDisk - ТЕСТ ЗВОНКОВ FIX</title>
+    <title>AudioDisk - ТЕСТ АУДИО СООБЩЕНИЙ</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -33,7 +33,8 @@
         }
         button.danger { background: #dc3545; }
         button.success { background: #28a745; }
-        input, textarea {
+        button.warning { background: #ff9800; }
+        input {
             width: 100%;
             padding: 12px;
             margin: 8px 0;
@@ -48,37 +49,25 @@
             padding: 12px;
             font-family: monospace;
             font-size: 11px;
-            max-height: 400px;
+            max-height: 300px;
             overflow-y: auto;
             white-space: pre-wrap;
         }
-        .status {
-            padding: 8px 12px;
-            border-radius: 20px;
+        .audio-message {
+            background: rgba(102,126,234,0.3);
+            border-radius: 16px;
+            padding: 12px;
             margin: 8px 0;
-            font-size: 14px;
         }
-        .status.active { background: #28a745; }
-        .status.inactive { background: #dc3545; }
-        .status.ringing { background: #ff9800; animation: pulse 1s infinite; }
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
-        hr { margin: 16px 0; border-color: rgba(255,255,255,0.2); }
-        .peer { border-left: 3px solid #667eea; padding-left: 16px; margin: 12px 0; }
-        .volume-test { 
-            background: #333; padding: 8px; border-radius: 12px; margin: 8px 0;
-            display: flex; align-items: center; gap: 12px;
-        }
+        audio { width: 100%; margin: 8px 0; }
+        .recording { animation: pulse 0.5s infinite; background: #dc3545; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
     </style>
 </head>
 <body>
 <div class="container">
-    <h1>📞 ТЕСТ ЗВОНКОВ WebRTC v2 (с аудиофиксом)</h1>
-    <p style="opacity:0.7;">✅ Соединение есть | 🔊 Аудио принудительное</p>
-    
-    <div class="card">
-        <button onclick="testMicrophone()" style="background:#ff9800;">🎤 ТЕСТ МИКРОФОНА</button>
-        <div id="micTestResult" style="margin-top:8px; font-size:12px;"></div>
-    </div>
+    <h1>🎤 ТЕСТ АУДИО СООБЩЕНИЙ</h1>
+    <p style="opacity:0.7;">Запись → Firebase Storage → Прослушивание</p>
     
     <div class="card" id="authPanel">
         <h3>🔐 Авторизация</h3>
@@ -91,26 +80,27 @@
     <div id="mainPanel" style="display:none;">
         <div class="card">
             <h3>👤 Вы: <span id="myLogin">-</span></h3>
-            <div id="callStatus" class="status inactive">⚪ Ожидание</div>
+            <div id="recordStatus">⚪ Готов к записи</div>
         </div>
         
         <div class="card">
-            <h3>📞 Управление звонком</h3>
-            <input type="text" id="targetLogin" placeholder="Логин собеседника (например, 222)">
+            <h3>📞 Аудио сообщение</h3>
+            <input type="text" id="targetLogin" placeholder="Кому (логин)">
             <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                <button id="callBtn" onclick="startCall()">📞 ПОЗВОНИТЬ</button>
-                <button id="endCallBtn" onclick="endCall()" class="danger" style="display:none;">🔴 ЗАВЕРШИТЬ</button>
+                <button id="recordBtn" onclick="startRecording()">🎤 НАЧАТЬ ЗАПИСЬ</button>
+                <button id="stopBtn" onclick="stopRecording()" class="danger" style="display:none;">⏹️ ОСТАНОВИТЬ</button>
             </div>
+            <div id="recordingTimer" style="font-size: 24px; text-align: center; margin: 12px 0;"></div>
         </div>
         
         <div class="card">
-            <h3>📋 ДРУГИЕ ПОЛЬЗОВАТЕЛИ</h3>
-            <div id="usersList"></div>
+            <h3>📥 Входящие аудио сообщения</h3>
+            <div id="incomingAudio"></div>
         </div>
         
         <div class="card">
-            <h3>📋 ЛОГ ВЫЗОВОВ</h3>
-            <button onclick="clearLog()">Очистить лог</button>
+            <h3>📋 ЛОГ</h3>
+            <button onclick="clearLog()">Очистить</button>
             <div id="log" class="log"></div>
         </div>
     </div>
@@ -118,6 +108,7 @@
 
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
 
 <script>
     const firebaseConfig = {
@@ -130,75 +121,18 @@
     
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
+    const storage = firebase.storage();
     
     let currentUser = null;
-    let localStream = null;
-    let peerConnection = null;
-    let callActive = false;
-    
-    const configuration = {
-        iceServers: [
-            { urls: 'stun:stun.l.google.com:19302' },
-            { urls: 'stun:stun1.l.google.com:19302' },
-            { urls: 'stun:stun2.l.google.com:19302' },
-            { urls: 'stun:stun3.l.google.com:19302' },
-            { urls: 'stun:stun4.l.google.com:19302' }
-        ]
-    };
-    
-    // Разрешаем аудио после любого тача
-    document.body.addEventListener('touchstart', () => {
-        addLog(`👆 Тач зарегистрирован - аудио разрешено`, 'info');
-    });
-    
-    document.body.addEventListener('click', () => {
-        addLog(`🖱️ Клик зарегистрирован`, 'info');
-    });
-    
-    async function testMicrophone() {
-        addLog(`🎤 Тест микрофона...`);
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            addLog(`✅ Микрофон работает! Уровень сигнала:`, 'success');
-            const audioContext = new AudioContext();
-            const source = audioContext.createMediaStreamSource(stream);
-            const analyser = audioContext.createAnalyser();
-            source.connect(analyser);
-            const dataArray = new Uint8Array(analyser.frequencyBinCount);
-            
-            let lastLevel = 0;
-            const interval = setInterval(() => {
-                analyser.getByteTimeDomainData(dataArray);
-                let max = 0;
-                for (let i = 0; i < dataArray.length; i++) {
-                    const v = (dataArray[i] - 128) / 128;
-                    max = Math.max(max, Math.abs(v));
-                }
-                if (max > 0.05) {
-                    document.getElementById('micTestResult').innerHTML = `🎙️ ГОВОРИТЕ! Уровень: ${Math.round(max * 100)}%`;
-                    document.getElementById('micTestResult').style.color = '#4caf50';
-                } else {
-                    document.getElementById('micTestResult').innerHTML = `🔇 Тишина... скажите что-нибудь`;
-                    document.getElementById('micTestResult').style.color = '#888';
-                }
-            }, 100);
-            
-            setTimeout(() => {
-                clearInterval(interval);
-                stream.getTracks().forEach(t => t.stop());
-                audioContext.close();
-                document.getElementById('micTestResult').innerHTML = `✅ Тест завершен`;
-            }, 5000);
-        } catch(e) {
-            addLog(`❌ Ошибка микрофона: ${e.message}`, 'error');
-            document.getElementById('micTestResult').innerHTML = `❌ Нет доступа к микрофону: ${e.message}`;
-        }
-    }
+    let mediaRecorder = null;
+    let audioChunks = [];
+    let recordingTimer = null;
+    let seconds = 0;
     
     function addLog(msg, type = 'info') {
         const logDiv = document.getElementById('log');
         const time = new Date().toLocaleTimeString();
-        const colors = { info: '#aaa', success: '#4caf50', error: '#f44336', warn: '#ff9800', call: '#2196f3' };
+        const colors = { info: '#aaa', success: '#4caf50', error: '#f44336', warn: '#ff9800', audio: '#2196f3' };
         const logEntry = `<div style="color: ${colors[type] || colors.info}; border-bottom:1px solid #222; padding:4px 0;">[${time}] ${msg}</div>`;
         logDiv.innerHTML += logEntry;
         logDiv.scrollTop = logDiv.scrollHeight;
@@ -248,358 +182,203 @@
         afterLogin();
     }
     
-    async function afterLogin() {
+    function afterLogin() {
         document.getElementById('authPanel').style.display = 'none';
         document.getElementById('mainPanel').style.display = 'block';
         document.getElementById('myLogin').innerText = currentUser.login;
-        addLog(`🔌 Инициализация WebRTC...`);
-        await loadUsers();
-        setupCallListener();
-        addLog(`✅ Готов к звонкам!`, 'success');
+        setupAudioListener();
+        addLog(`✅ Готов к записи и отправке аудио`, 'success');
     }
     
-    async function loadUsers() {
-        const snapshot = await db.ref('users').once('value');
-        let html = '';
-        snapshot.forEach(child => {
-            const user = child.val();
-            if (user.login !== currentUser.login) {
-                html += `<div class="peer">
-                    <strong>${user.login}</strong> (${user.name}) 
-                    <span style="color:${user.online ? '#4caf50' : '#888'}">● ${user.online ? 'онлайн' : 'офлайн'}</span>
-                    <button onclick="callTo('${user.login}')" style="padding:6px 12px; font-size:12px;">📞 Позвонить</button>
-                </div>`;
-            }
-        });
-        document.getElementById('usersList').innerHTML = html || '<div>Нет других пользователей</div>';
-    }
-    
-    function callTo(login) {
-        document.getElementById('targetLogin').value = login;
-        startCall();
-    }
-    
-    function setupCallListener() {
-        if (!currentUser) return;
-        
-        const offerRef = db.ref(`calls/${currentUser.id}/offer`);
-        offerRef.on('value', async (snap) => {
-            const offerData = snap.val();
-            if (offerData && !callActive && offerData.from !== currentUser.id) {
-                addLog(`📞 ВХОДЯЩИЙ ЗВОНОК от ${offerData.fromLogin || offerData.from}`, 'call');
-                
-                if (confirm(`📞 Входящий звонок от ${offerData.fromLogin || offerData.from}\nОтветить?`)) {
-                    addLog(`✅ Принимаем звонок`, 'success');
-                    await acceptCall(offerData.from, offerData.offer);
-                    await offerRef.remove();
-                } else {
-                    addLog(`❌ Отклонен`, 'error');
-                    await offerRef.remove();
-                }
-            }
-        });
-    }
-    
-    async function startCall() {
-        if (!currentUser) return addLog('❌ Сначала войдите', 'error');
+    // ЗАПИСЬ АУДИО
+    async function startRecording() {
+        if (mediaRecorder && mediaRecorder.state === 'recording') {
+            addLog('⚠️ Запись уже идет', 'warn');
+            return;
+        }
         
         const targetLogin = document.getElementById('targetLogin').value.trim();
-        if (!targetLogin) return addLog('❌ Введите логин собеседника', 'error');
-        if (callActive) return addLog('❌ Звонок уже активен', 'warn');
+        if (!targetLogin) {
+            addLog('❌ Укажите получателя', 'error');
+            return;
+        }
         
-        addLog(`🔍 Ищем ${targetLogin}...`);
+        addLog(`🎤 Запрос доступа к микрофону...`);
         
-        const snapshot = await db.ref('users').orderByChild('login').equalTo(targetLogin).once('value');
-        if (!snapshot.exists()) return addLog(`❌ ${targetLogin} не найден`, 'error');
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            audioChunks = [];
+            mediaRecorder = new MediaRecorder(stream);
+            
+            mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) {
+                    audioChunks.push(event.data);
+                }
+            };
+            
+            mediaRecorder.onstop = async () => {
+                addLog(`⏹️ Запись остановлена, обрабатываем...`);
+                const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                const audioUrl = URL.createObjectURL(audioBlob);
+                
+                // Для прослушивания на месте
+                const tempAudio = new Audio(audioUrl);
+                addLog(`🎵 Длительность: ${Math.round(audioBlob.size / 1000)} KB`, 'audio');
+                
+                // Отправляем
+                await sendAudio(targetLogin, audioBlob);
+                
+                stream.getTracks().forEach(track => track.stop());
+                URL.revokeObjectURL(audioUrl);
+            };
+            
+            mediaRecorder.start(1000);
+            addLog(`✅ Запись началась! Говорите...`, 'success');
+            
+            document.getElementById('recordBtn').style.display = 'none';
+            document.getElementById('stopBtn').style.display = 'inline-block';
+            document.getElementById('recordStatus').innerHTML = '🔴 ИДЕТ ЗАПИСЬ...';
+            document.getElementById('recordStatus').className = 'recording';
+            
+            // Таймер
+            seconds = 0;
+            recordingTimer = setInterval(() => {
+                seconds++;
+                const mins = Math.floor(seconds / 60);
+                const secs = seconds % 60;
+                document.getElementById('recordingTimer').innerText = `${mins.toString().padStart(2,'0')}:${secs.toString().padStart(2,'0')}`;
+                if (seconds >= 60) {
+                    addLog(`⏰ Автостоп через 60 секунд`, 'warn');
+                    stopRecording();
+                }
+            }, 1000);
+            
+        } catch(e) {
+            addLog(`❌ Ошибка доступа к микрофону: ${e.message}`, 'error');
+        }
+    }
+    
+    function stopRecording() {
+        if (mediaRecorder && mediaRecorder.state === 'recording') {
+            mediaRecorder.stop();
+            clearInterval(recordingTimer);
+            document.getElementById('recordBtn').style.display = 'inline-block';
+            document.getElementById('stopBtn').style.display = 'none';
+            document.getElementById('recordStatus').innerHTML = '⚪ Готов к записи';
+            document.getElementById('recordStatus').className = '';
+            document.getElementById('recordingTimer').innerText = '';
+            addLog(`⏹️ Запись остановлена`, 'info');
+        }
+    }
+    
+    // ОТПРАВКА АУДИО
+    async function sendAudio(toLogin, audioBlob) {
+        addLog(`📤 Поиск пользователя ${toLogin}...`);
+        
+        const snapshot = await db.ref('users').orderByChild('login').equalTo(toLogin).once('value');
+        if (!snapshot.exists()) {
+            addLog(`❌ Получатель ${toLogin} не найден`, 'error');
+            return;
+        }
         
         let targetId, targetData;
         snapshot.forEach(child => { targetId = child.key; targetData = child.val(); });
         
-        addLog(`✅ Найден: ${targetData.login}, онлайн: ${targetData.online ? 'да' : 'нет'}`, 'success');
+        addLog(`✅ Получатель найден: ${targetData.login}`, 'success');
+        
+        // Загружаем в Storage
+        const filename = `audio_${Date.now()}.webm`;
+        const storageRef = storage.ref(`audio_messages/${targetId}/${currentUser.id}/${filename}`);
+        
+        addLog(`☁️ Загрузка в Firebase Storage...`);
         
         try {
-            addLog(`🎤 Запрашиваем микрофон...`);
-            localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            addLog(`✅ Микрофон получен`, 'success');
+            const uploadTask = await storageRef.put(audioBlob);
+            const downloadUrl = await storageRef.getDownloadURL();
+            addLog(`✅ Аудио загружено, размер: ${Math.round(audioBlob.size / 1000)} KB`, 'success');
             
-            // Тест микрофона перед звонком
-            const audioContext = new AudioContext();
-            const source = audioContext.createMediaStreamSource(localStream);
-            const analyser = audioContext.createAnalyser();
-            source.connect(analyser);
-            const dataArray = new Uint8Array(analyser.frequencyBinCount);
-            setTimeout(() => {
-                analyser.getByteTimeDomainData(dataArray);
-                let max = 0;
-                for (let i = 0; i < dataArray.length; i++) {
-                    const v = (dataArray[i] - 128) / 128;
-                    max = Math.max(max, Math.abs(v));
-                }
-                if (max > 0.05) {
-                    addLog(`🎙️ Микрофон активен, уровень сигнала: ${Math.round(max * 100)}%`, 'success');
-                } else {
-                    addLog(`⚠️ Микрофон работает, но тихо. Поговорите громче!`, 'warn');
-                }
-                audioContext.close();
-            }, 1000);
-            
-            peerConnection = new RTCPeerConnection(configuration);
-            
-            localStream.getTracks().forEach(track => {
-                peerConnection.addTrack(track, localStream);
-                addLog(`➕ Добавлен трек: ${track.kind} ${track.label || ''}`);
-            });
-            
-            peerConnection.onicecandidate = (event) => {
-                if (event.candidate) {
-                    addLog(`🧊 ICE: ${event.candidate.type}`);
-                    db.ref(`calls/${targetId}/candidates`).push({
-                        candidate: {
-                            candidate: event.candidate.candidate,
-                            sdpMid: event.candidate.sdpMid,
-                            sdpMLineIndex: event.candidate.sdpMLineIndex
-                        },
-                        from: currentUser.id,
-                        fromLogin: currentUser.login,
-                        timestamp: Date.now()
-                    });
-                }
-            };
-            
-            peerConnection.ontrack = (event) => {
-                addLog(`📡 ПОЛУЧЕН АУДИОПОТОК!`, 'success');
-                const audio = new Audio();
-                audio.srcObject = event.streams[0];
-                audio.volume = 1.0;
-                audio.autoplay = true;
-                
-                const tryPlay = async () => {
-                    try {
-                        await audio.play();
-                        addLog(`🔊 АУДИО ВОСПРОИЗВОДИТСЯ!`, 'success');
-                        callActive = true;
-                        document.getElementById('callStatus').className = 'status active';
-                        document.getElementById('callStatus').innerHTML = '🟢 ЗВОНОК АКТИВЕН + ЗВУК';
-                        document.getElementById('callBtn').style.display = 'none';
-                        document.getElementById('endCallBtn').style.display = 'inline-block';
-                    } catch(e) {
-                        addLog(`⚠️ Автовоспроизведение заблокировано: ${e.message}`, 'warn');
-                        addLog(`👉 Коснись/кликни экран для активации звука`, 'warn');
-                        
-                        const activateSound = async () => {
-                            try {
-                                await audio.play();
-                                addLog(`✅ Звук активирован после касания!`, 'success');
-                                document.body.removeEventListener('touchstart', activateSound);
-                                document.body.removeEventListener('click', activateSound);
-                            } catch(e2) {}
-                        };
-                        document.body.addEventListener('touchstart', activateSound, { once: true });
-                        document.body.addEventListener('click', activateSound, { once: true });
-                        
-                        callActive = true;
-                        document.getElementById('callStatus').className = 'status active';
-                        document.getElementById('callStatus').innerHTML = '🟢 ЗВОНОК АКТИВЕН (нажми на экран для звука)';
-                        document.getElementById('callBtn').style.display = 'none';
-                        document.getElementById('endCallBtn').style.display = 'inline-block';
-                    }
-                };
-                tryPlay();
-            };
-            
-            peerConnection.onconnectionstatechange = () => {
-                addLog(`🔗 Состояние: ${peerConnection.connectionState}`);
-                if (peerConnection.connectionState === 'connected') {
-                    addLog(`✅ СОЕДИНЕНИЕ УСТАНОВЛЕНО!`, 'success');
-                } else if (peerConnection.connectionState === 'failed') {
-                    addLog(`❌ Соединение не удалось`, 'error');
-                    endCall();
-                } else if (peerConnection.connectionState === 'disconnected') {
-                    addLog(`⚠️ Разрыв соединения`, 'warn');
-                    endCall();
-                }
-            };
-            
-            const offer = await peerConnection.createOffer();
-            await peerConnection.setLocalDescription(offer);
-            addLog(`✅ Offer создан`);
-            
-            await db.ref(`calls/${targetId}/offer`).set({
-                offer: { type: offer.type, sdp: offer.sdp },
+            // Сохраняем метаданные в Realtime Database
+            const messageId = Date.now().toString();
+            const messageData = {
                 from: currentUser.id,
                 fromLogin: currentUser.login,
-                timestamp: Date.now()
-            });
-            addLog(`✅ Offer отправлен`, 'success');
+                fromName: currentUser.name,
+                to: targetId,
+                toLogin: targetData.login,
+                url: downloadUrl,
+                duration: seconds,
+                size: audioBlob.size,
+                timestamp: Date.now(),
+                read: false
+            };
             
-            document.getElementById('callStatus').className = 'status ringing';
-            document.getElementById('callStatus').innerHTML = '📞 ЗВОНИМ...';
-            document.getElementById('callBtn').style.display = 'none';
+            await db.ref(`audio_messages/${targetId}/${messageId}`).set(messageData);
+            await db.ref(`audio_messages/${currentUser.id}/${messageId}`).set(messageData);
             
-            const answerRef = db.ref(`calls/${currentUser.id}/answer`);
-            const timeout = setTimeout(() => {
-                if (!callActive) {
-                    addLog(`⏰ Таймаут 30 сек - нет ответа`, 'warn');
-                    endCall();
-                }
-            }, 30000);
-            
-            answerRef.once('value', async (snap) => {
-                clearTimeout(timeout);
-                const answerData = snap.val();
-                if (answerData && peerConnection && !peerConnection.remoteDescription) {
-                    addLog(`📡 Получен Answer`);
-                    const answer = new RTCSessionDescription({
-                        type: answerData.answer.type,
-                        sdp: answerData.answer.sdp
-                    });
-                    await peerConnection.setRemoteDescription(answer);
-                    await answerRef.remove();
-                    addLog(`✅ Answer применен`, 'success');
-                    
-                    db.ref(`calls/${currentUser.id}/candidates`).on('child_added', async (candSnap) => {
-                        if (peerConnection && candSnap.val().from !== currentUser.id) {
-                            const candData = candSnap.val().candidate;
-                            const candidate = new RTCIceCandidate({
-                                candidate: candData.candidate,
-                                sdpMid: candData.sdpMid,
-                                sdpMLineIndex: candData.sdpMLineIndex
-                            });
-                            await peerConnection.addIceCandidate(candidate);
-                        }
-                    });
-                }
-            });
+            addLog(`✅ Аудио сообщение отправлено ${toLogin}!`, 'success');
             
         } catch(e) {
-            addLog(`❌ Ошибка: ${e.message}`, 'error');
-            endCall();
+            addLog(`❌ Ошибка загрузки: ${e.message}`, 'error');
         }
     }
     
-    async function acceptCall(fromUserId, offer) {
-        try {
-            addLog(`🎤 Запрашиваем микрофон...`);
-            localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            addLog(`✅ Микрофон получен`, 'success');
-            
-            peerConnection = new RTCPeerConnection(configuration);
-            
-            localStream.getTracks().forEach(track => {
-                peerConnection.addTrack(track, localStream);
-            });
-            
-            peerConnection.onicecandidate = (event) => {
-                if (event.candidate) {
-                    db.ref(`calls/${fromUserId}/candidates`).push({
-                        candidate: {
-                            candidate: event.candidate.candidate,
-                            sdpMid: event.candidate.sdpMid,
-                            sdpMLineIndex: event.candidate.sdpMLineIndex
-                        },
-                        from: currentUser.id,
-                        fromLogin: currentUser.login,
-                        timestamp: Date.now()
-                    });
-                }
-            };
-            
-            peerConnection.ontrack = (event) => {
-                addLog(`📡 ПОЛУЧЕН АУДИОПОТОК от звонящего!`, 'success');
-                const audio = new Audio();
-                audio.srcObject = event.streams[0];
-                audio.volume = 1.0;
-                audio.autoplay = true;
-                
-                const tryPlay = async () => {
-                    try {
-                        await audio.play();
-                        addLog(`🔊 ЗВУК ВОСПРОИЗВОДИТСЯ!`, 'success');
-                        callActive = true;
-                        document.getElementById('callStatus').className = 'status active';
-                        document.getElementById('callStatus').innerHTML = '🟢 ЗВОНОК АКТИВЕН + ЗВУК';
-                        document.getElementById('callBtn').style.display = 'none';
-                        document.getElementById('endCallBtn').style.display = 'inline-block';
-                    } catch(e) {
-                        addLog(`⚠️ Автовоспроизведение заблокировано`, 'warn');
-                        addLog(`👉 Коснись экрана для активации звука`, 'warn');
-                        
-                        const activateSound = async () => {
-                            try {
-                                await audio.play();
-                                addLog(`✅ Звук активирован!`, 'success');
-                            } catch(e2) {}
-                            document.body.removeEventListener('touchstart', activateSound);
-                            document.body.removeEventListener('click', activateSound);
-                        };
-                        document.body.addEventListener('touchstart', activateSound, { once: true });
-                        document.body.addEventListener('click', activateSound, { once: true });
-                        
-                        callActive = true;
-                        document.getElementById('callStatus').innerHTML = '🟢 ЗВОНОК АКТИВЕН (нажми на экран)';
-                        document.getElementById('callBtn').style.display = 'none';
-                        document.getElementById('endCallBtn').style.display = 'inline-block';
-                    }
-                };
-                tryPlay();
-            };
-            
-            peerConnection.onconnectionstatechange = () => {
-                addLog(`🔗 Состояние: ${peerConnection.connectionState}`);
-            };
-            
-            await peerConnection.setRemoteDescription(new RTCSessionDescription({
-                type: offer.type,
-                sdp: offer.sdp
-            }));
-            
-            const answer = await peerConnection.createAnswer();
-            await peerConnection.setLocalDescription(answer);
-            
-            await db.ref(`calls/${fromUserId}/answer`).set({
-                answer: { type: answer.type, sdp: answer.sdp },
-                from: currentUser.id,
-                fromLogin: currentUser.login,
-                timestamp: Date.now()
-            });
-            addLog(`✅ Answer отправлен`, 'success');
-            
-            db.ref(`calls/${currentUser.id}/candidates`).on('child_added', async (snap) => {
-                if (peerConnection && snap.val().from !== currentUser.id) {
-                    const candData = snap.val().candidate;
-                    const candidate = new RTCIceCandidate({
-                        candidate: candData.candidate,
-                        sdpMid: candData.sdpMid,
-                        sdpMLineIndex: candData.sdpMLineIndex
-                    });
-                    await peerConnection.addIceCandidate(candidate);
-                }
-            });
-            
-        } catch(e) {
-            addLog(`❌ Ошибка принятия: ${e.message}`, 'error');
-            endCall();
-        }
+    // ПРОСЛУШИВАНИЕ ВХОДЯЩИХ
+    function setupAudioListener() {
+        if (!currentUser) return;
+        
+        const audioRef = db.ref(`audio_messages/${currentUser.id}`);
+        audioRef.on('child_added', (snap) => {
+            const msg = snap.val();
+            if (!msg.read) {
+                addLog(`📨 НОВОЕ АУДИО СООБЩЕНИЕ от ${msg.fromLogin} (${Math.round(msg.size/1000)} KB)`, 'audio');
+                displayAudioMessage(msg, snap.key);
+                snap.ref.update({ read: true });
+            }
+        });
     }
     
-    function endCall() {
-        addLog(`🔴 Завершение звонка...`);
-        if (peerConnection) {
-            peerConnection.close();
-            peerConnection = null;
-        }
-        if (localStream) {
-            localStream.getTracks().forEach(track => track.stop());
-            localStream = null;
-        }
-        callActive = false;
-        document.getElementById('callStatus').className = 'status inactive';
-        document.getElementById('callStatus').innerHTML = '⚪ Ожидание';
-        document.getElementById('callBtn').style.display = 'inline-block';
-        document.getElementById('endCallBtn').style.display = 'none';
-        addLog(`✅ Звонок завершен`, 'info');
+    function displayAudioMessage(msg, msgId) {
+        const container = document.getElementById('incomingAudio');
+        const existing = document.getElementById(`audio_${msgId}`);
+        if (existing) return;
+        
+        const div = document.createElement('div');
+        div.className = 'audio-message';
+        div.id = `audio_${msgId}`;
+        div.innerHTML = `
+            <strong>📣 ${msg.fromLogin}</strong>
+            <small>${new Date(msg.timestamp).toLocaleTimeString()}</small>
+            <audio controls src="${msg.url}" preload="auto"></audio>
+            <div style="display: flex; gap: 8px; margin-top: 8px;">
+                <button onclick="replyTo('${msg.fromLogin}')" style="padding:6px 12px; font-size:12px;">📝 Ответить</button>
+                <button onclick="deleteAudio('${msgId}')" style="padding:6px 12px; font-size:12px; background:#dc3545;">🗑️ Удалить</button>
+            </div>
+        `;
+        container.prepend(div);
+        
+        // Автоматическое воспроизведение (требует взаимодействия)
+        const audio = div.querySelector('audio');
+        const playOnInteraction = () => {
+            audio.play().catch(e => addLog(`⚠️ Автовоспроизведение: ${e.message}`, 'warn'));
+            document.body.removeEventListener('click', playOnInteraction);
+            document.body.removeEventListener('touchstart', playOnInteraction);
+        };
+        document.body.addEventListener('click', playOnInteraction, { once: true });
+        document.body.addEventListener('touchstart', playOnInteraction, { once: true });
     }
     
+    function replyTo(login) {
+        document.getElementById('targetLogin').value = login;
+        addLog(`✏️ Готов ответить ${login}. Нажми "Начать запись"`, 'info');
+    }
+    
+    async function deleteAudio(msgId) {
+        await db.ref(`audio_messages/${currentUser.id}/${msgId}`).remove();
+        document.getElementById(`audio_${msgId}`)?.remove();
+        addLog(`🗑️ Аудио сообщение удалено`, 'info');
+    }
+    
+    // Автовход
     const saved = localStorage.getItem('user');
     if (saved) {
         currentUser = JSON.parse(saved);
@@ -607,8 +386,12 @@
         afterLogin();
     }
     
-    addLog(`🚀 ТЕСТ ЗВОНКОВ v2 ЗАПУЩЕН`, 'success');
-    addLog(`📌 Нажми "ТЕСТ МИКРОФОНА" и поговори`, 'call');
+    addLog(`🚀 ТЕСТ АУДИО СООБЩЕНИЙ ЗАПУЩЕН`, 'success');
+    addLog(`📌 Инструкция:`, 'info');
+    addLog(`   1. Войдите как 111 (телефон) и 222 (компьютер)`, 'info');
+    addLog(`   2. Укажите кому отправить (логин)`, 'info');
+    addLog(`   3. Нажмите "Начать запись" -> скажите что-то -> "Остановить"`, 'info');
+    addLog(`   4. У собеседника появится аудио для прослушивания`, 'info');
 </script>
 </body>
 </html>
