@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>AudioDisk - ТЕСТ ЗВОНКОВ</title>
+    <title>AudioDisk - ТЕСТ ЗВОНКОВ FIX</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -64,14 +64,22 @@
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
         hr { margin: 16px 0; border-color: rgba(255,255,255,0.2); }
         .peer { border-left: 3px solid #667eea; padding-left: 16px; margin: 12px 0; }
+        .volume-test { 
+            background: #333; padding: 8px; border-radius: 12px; margin: 8px 0;
+            display: flex; align-items: center; gap: 12px;
+        }
     </style>
 </head>
 <body>
 <div class="container">
-    <h1>📞 ТЕСТ ЗВОНКОВ WebRTC</h1>
-    <p style="opacity:0.7;">Логирование всех шагов | Firebase + WebRTC</p>
+    <h1>📞 ТЕСТ ЗВОНКОВ WebRTC v2 (с аудиофиксом)</h1>
+    <p style="opacity:0.7;">✅ Соединение есть | 🔊 Аудио принудительное</p>
     
-    <!-- Авторизация -->
+    <div class="card">
+        <button onclick="testMicrophone()" style="background:#ff9800;">🎤 ТЕСТ МИКРОФОНА</button>
+        <div id="micTestResult" style="margin-top:8px; font-size:12px;"></div>
+    </div>
+    
     <div class="card" id="authPanel">
         <h3>🔐 Авторизация</h3>
         <input type="text" id="loginInput" placeholder="Логин">
@@ -80,7 +88,6 @@
         <button onclick="login()" class="success">Вход</button>
     </div>
     
-    <!-- Основная панель (видна после входа) -->
     <div id="mainPanel" style="display:none;">
         <div class="card">
             <h3>👤 Вы: <span id="myLogin">-</span></h3>
@@ -113,7 +120,6 @@
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
 
 <script>
-    // ========== FIREBASE ==========
     const firebaseConfig = {
         apiKey: "AIzaSyCCIY9lL15FpypsI310HCuTxQSwkpCpuiE",
         authDomain: "audiozvonok-b340d.firebaseapp.com",
@@ -125,14 +131,11 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
     
-    // ========== ПЕРЕМЕННЫЕ ==========
     let currentUser = null;
     let localStream = null;
     let peerConnection = null;
     let callActive = false;
-    let currentCallWith = null;
     
-    // Конфигурация STUN серверов
     const configuration = {
         iceServers: [
             { urls: 'stun:stun.l.google.com:19302' },
@@ -143,7 +146,55 @@
         ]
     };
     
-    // ========== ЛОГГИРОВАНИЕ ==========
+    // Разрешаем аудио после любого тача
+    document.body.addEventListener('touchstart', () => {
+        addLog(`👆 Тач зарегистрирован - аудио разрешено`, 'info');
+    });
+    
+    document.body.addEventListener('click', () => {
+        addLog(`🖱️ Клик зарегистрирован`, 'info');
+    });
+    
+    async function testMicrophone() {
+        addLog(`🎤 Тест микрофона...`);
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            addLog(`✅ Микрофон работает! Уровень сигнала:`, 'success');
+            const audioContext = new AudioContext();
+            const source = audioContext.createMediaStreamSource(stream);
+            const analyser = audioContext.createAnalyser();
+            source.connect(analyser);
+            const dataArray = new Uint8Array(analyser.frequencyBinCount);
+            
+            let lastLevel = 0;
+            const interval = setInterval(() => {
+                analyser.getByteTimeDomainData(dataArray);
+                let max = 0;
+                for (let i = 0; i < dataArray.length; i++) {
+                    const v = (dataArray[i] - 128) / 128;
+                    max = Math.max(max, Math.abs(v));
+                }
+                if (max > 0.05) {
+                    document.getElementById('micTestResult').innerHTML = `🎙️ ГОВОРИТЕ! Уровень: ${Math.round(max * 100)}%`;
+                    document.getElementById('micTestResult').style.color = '#4caf50';
+                } else {
+                    document.getElementById('micTestResult').innerHTML = `🔇 Тишина... скажите что-нибудь`;
+                    document.getElementById('micTestResult').style.color = '#888';
+                }
+            }, 100);
+            
+            setTimeout(() => {
+                clearInterval(interval);
+                stream.getTracks().forEach(t => t.stop());
+                audioContext.close();
+                document.getElementById('micTestResult').innerHTML = `✅ Тест завершен`;
+            }, 5000);
+        } catch(e) {
+            addLog(`❌ Ошибка микрофона: ${e.message}`, 'error');
+            document.getElementById('micTestResult').innerHTML = `❌ Нет доступа к микрофону: ${e.message}`;
+        }
+    }
+    
     function addLog(msg, type = 'info') {
         const logDiv = document.getElementById('log');
         const time = new Date().toLocaleTimeString();
@@ -159,7 +210,6 @@
         addLog('📋 Лог очищен');
     }
     
-    // ========== АВТОРИЗАЦИЯ ==========
     async function register() {
         const login = document.getElementById('loginInput').value.trim();
         const password = document.getElementById('passwordInput').value.trim();
@@ -175,7 +225,7 @@
         
         currentUser = { id: userId, login, name: login };
         localStorage.setItem('user', JSON.stringify(currentUser));
-        addLog(`✅ Регистрация: ${login} (ID: ${userId.substring(0,8)}...)`, 'success');
+        addLog(`✅ Регистрация: ${login}`, 'success');
         afterLogin();
     }
     
@@ -194,7 +244,7 @@
         currentUser = { id: userId, login, name: userData.name };
         localStorage.setItem('user', JSON.stringify(currentUser));
         await db.ref(`users/${userId}/online`).set(true);
-        addLog(`✅ Вход: ${login} (ID: ${userId.substring(0,8)}...)`, 'success');
+        addLog(`✅ Вход: ${login}`, 'success');
         afterLogin();
     }
     
@@ -202,24 +252,12 @@
         document.getElementById('authPanel').style.display = 'none';
         document.getElementById('mainPanel').style.display = 'block';
         document.getElementById('myLogin').innerText = currentUser.login;
-        
         addLog(`🔌 Инициализация WebRTC...`);
         await loadUsers();
         setupCallListener();
-        setupConnectionMonitor();
+        addLog(`✅ Готов к звонкам!`, 'success');
     }
     
-    async function logout() {
-        if (currentUser) await db.ref(`users/${currentUser.id}/online`).set(false);
-        endCall();
-        currentUser = null;
-        localStorage.clear();
-        document.getElementById('authPanel').style.display = 'block';
-        document.getElementById('mainPanel').style.display = 'none';
-        addLog('👋 Выход выполнен');
-    }
-    
-    // ========== ЗАГРУЗКА ПОЛЬЗОВАТЕЛЕЙ ==========
     async function loadUsers() {
         const snapshot = await db.ref('users').once('value');
         let html = '';
@@ -241,18 +279,8 @@
         startCall();
     }
     
-    // ========== МОНИТОРИНГ СОЕДИНЕНИЯ ==========
-    function setupConnectionMonitor() {
-        db.ref('.info/connected').on('value', (snap) => {
-            addLog(`🔌 Firebase WebSocket: ${snap.val() ? 'ПОДКЛЮЧЕН ✅' : 'ОТКЛЮЧЕН ❌'}`, snap.val() ? 'success' : 'error');
-        });
-    }
-    
-    // ========== ОСНОВНАЯ ЛОГИКА ЗВОНКОВ ==========
     function setupCallListener() {
         if (!currentUser) return;
-        
-        addLog(`📡 Слушаю входящие звонки в /calls/${currentUser.id}/offer`);
         
         const offerRef = db.ref(`calls/${currentUser.id}/offer`);
         offerRef.on('value', async (snap) => {
@@ -260,84 +288,71 @@
             if (offerData && !callActive && offerData.from !== currentUser.id) {
                 addLog(`📞 ВХОДЯЩИЙ ЗВОНОК от ${offerData.fromLogin || offerData.from}`, 'call');
                 
-                const answer = confirm(`📞 Входящий звонок от ${offerData.fromLogin || offerData.from}\nОтветить?`);
-                
-                if (answer) {
-                    addLog(`✅ Принимаем звонок от ${offerData.fromLogin || offerData.from}`, 'success');
+                if (confirm(`📞 Входящий звонок от ${offerData.fromLogin || offerData.from}\nОтветить?`)) {
+                    addLog(`✅ Принимаем звонок`, 'success');
                     await acceptCall(offerData.from, offerData.offer);
                     await offerRef.remove();
                 } else {
-                    addLog(`❌ Отклонен звонок от ${offerData.fromLogin || offerData.from}`, 'error');
+                    addLog(`❌ Отклонен`, 'error');
                     await offerRef.remove();
                 }
             }
         });
-        
-        // Автоматическая очистка старых offer (более 30 секунд)
-        setInterval(async () => {
-            const snapshot = await offerRef.once('value');
-            if (snapshot.exists()) {
-                const data = snapshot.val();
-                if (data.timestamp && Date.now() - data.timestamp > 30000) {
-                    await offerRef.remove();
-                    addLog('🧹 Очищен старый offer (таймаут 30с)', 'warn');
-                }
-            }
-        }, 10000);
     }
     
     async function startCall() {
-        if (!currentUser) {
-            addLog('❌ Сначала войдите', 'error');
-            return;
-        }
+        if (!currentUser) return addLog('❌ Сначала войдите', 'error');
         
         const targetLogin = document.getElementById('targetLogin').value.trim();
-        if (!targetLogin) {
-            addLog('❌ Введите логин собеседника', 'error');
-            return;
-        }
+        if (!targetLogin) return addLog('❌ Введите логин собеседника', 'error');
+        if (callActive) return addLog('❌ Звонок уже активен', 'warn');
         
-        if (callActive) {
-            addLog('❌ Звонок уже активен', 'warn');
-            return;
-        }
-        
-        addLog(`🔍 Ищем пользователя ${targetLogin}...`);
+        addLog(`🔍 Ищем ${targetLogin}...`);
         
         const snapshot = await db.ref('users').orderByChild('login').equalTo(targetLogin).once('value');
-        if (!snapshot.exists()) {
-            addLog(`❌ Пользователь ${targetLogin} не найден`, 'error');
-            return;
-        }
+        if (!snapshot.exists()) return addLog(`❌ ${targetLogin} не найден`, 'error');
         
         let targetId, targetData;
         snapshot.forEach(child => { targetId = child.key; targetData = child.val(); });
         
-        addLog(`✅ Найден: ${targetData.login} (ID: ${targetId.substring(0,8)}...), онлайн: ${targetData.online ? 'да' : 'нет'}`, 'success');
-        
-        if (!targetData.online) {
-            addLog(`⚠️ ${targetLogin} не в сети! Звонок может не пройти.`, 'warn');
-        }
-        
-        currentCallWith = { id: targetId, login: targetLogin };
+        addLog(`✅ Найден: ${targetData.login}, онлайн: ${targetData.online ? 'да' : 'нет'}`, 'success');
         
         try {
-            addLog(`🎤 Запрашиваем доступ к микрофону...`);
+            addLog(`🎤 Запрашиваем микрофон...`);
             localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            addLog(`✅ Микрофон доступен`, 'success');
+            addLog(`✅ Микрофон получен`, 'success');
             
-            addLog(`🔧 Создаем RTCPeerConnection...`);
+            // Тест микрофона перед звонком
+            const audioContext = new AudioContext();
+            const source = audioContext.createMediaStreamSource(localStream);
+            const analyser = audioContext.createAnalyser();
+            source.connect(analyser);
+            const dataArray = new Uint8Array(analyser.frequencyBinCount);
+            setTimeout(() => {
+                analyser.getByteTimeDomainData(dataArray);
+                let max = 0;
+                for (let i = 0; i < dataArray.length; i++) {
+                    const v = (dataArray[i] - 128) / 128;
+                    max = Math.max(max, Math.abs(v));
+                }
+                if (max > 0.05) {
+                    addLog(`🎙️ Микрофон активен, уровень сигнала: ${Math.round(max * 100)}%`, 'success');
+                } else {
+                    addLog(`⚠️ Микрофон работает, но тихо. Поговорите громче!`, 'warn');
+                }
+                audioContext.close();
+            }, 1000);
+            
             peerConnection = new RTCPeerConnection(configuration);
             
             localStream.getTracks().forEach(track => {
                 peerConnection.addTrack(track, localStream);
-                addLog(`➕ Добавлен трек: ${track.kind}`);
+                addLog(`➕ Добавлен трек: ${track.kind} ${track.label || ''}`);
             });
             
             peerConnection.onicecandidate = (event) => {
                 if (event.candidate) {
-                    addLog(`🧊 ICE кандидат: ${event.candidate.type} (${event.candidate.candidate.substring(0, 50)}...)`);
+                    addLog(`🧊 ICE: ${event.candidate.type}`);
                     db.ref(`calls/${targetId}/candidates`).push({
                         candidate: {
                             candidate: event.candidate.candidate,
@@ -352,58 +367,79 @@
             };
             
             peerConnection.ontrack = (event) => {
-                addLog(`📡 ПОЛУЧЕН АУДИОПОТОК от собеседника!`, 'success');
+                addLog(`📡 ПОЛУЧЕН АУДИОПОТОК!`, 'success');
                 const audio = new Audio();
                 audio.srcObject = event.streams[0];
-                audio.play().catch(e => addLog(`⚠️ Автовоспроизведение заблокировано: ${e.message}`, 'warn'));
-                document.getElementById('callStatus').className = 'status active';
-                document.getElementById('callStatus').innerHTML = '🟢 ЗВОНОК АКТИВЕН';
-                callActive = true;
-                document.getElementById('callBtn').style.display = 'none';
-                document.getElementById('endCallBtn').style.display = 'inline-block';
-                addLog(`🔊 Звонок установлен! Говорите.`, 'success');
+                audio.volume = 1.0;
+                audio.autoplay = true;
+                
+                const tryPlay = async () => {
+                    try {
+                        await audio.play();
+                        addLog(`🔊 АУДИО ВОСПРОИЗВОДИТСЯ!`, 'success');
+                        callActive = true;
+                        document.getElementById('callStatus').className = 'status active';
+                        document.getElementById('callStatus').innerHTML = '🟢 ЗВОНОК АКТИВЕН + ЗВУК';
+                        document.getElementById('callBtn').style.display = 'none';
+                        document.getElementById('endCallBtn').style.display = 'inline-block';
+                    } catch(e) {
+                        addLog(`⚠️ Автовоспроизведение заблокировано: ${e.message}`, 'warn');
+                        addLog(`👉 Коснись/кликни экран для активации звука`, 'warn');
+                        
+                        const activateSound = async () => {
+                            try {
+                                await audio.play();
+                                addLog(`✅ Звук активирован после касания!`, 'success');
+                                document.body.removeEventListener('touchstart', activateSound);
+                                document.body.removeEventListener('click', activateSound);
+                            } catch(e2) {}
+                        };
+                        document.body.addEventListener('touchstart', activateSound, { once: true });
+                        document.body.addEventListener('click', activateSound, { once: true });
+                        
+                        callActive = true;
+                        document.getElementById('callStatus').className = 'status active';
+                        document.getElementById('callStatus').innerHTML = '🟢 ЗВОНОК АКТИВЕН (нажми на экран для звука)';
+                        document.getElementById('callBtn').style.display = 'none';
+                        document.getElementById('endCallBtn').style.display = 'inline-block';
+                    }
+                };
+                tryPlay();
             };
             
             peerConnection.onconnectionstatechange = () => {
-                addLog(`🔗 Состояние соединения: ${peerConnection.connectionState}`, 'info');
+                addLog(`🔗 Состояние: ${peerConnection.connectionState}`);
                 if (peerConnection.connectionState === 'connected') {
-                    addLog(`✅ Соединение установлено!`, 'success');
+                    addLog(`✅ СОЕДИНЕНИЕ УСТАНОВЛЕНО!`, 'success');
                 } else if (peerConnection.connectionState === 'failed') {
-                    addLog(`❌ Соединение не удалось (возможно нужен TURN сервер)`, 'error');
+                    addLog(`❌ Соединение не удалось`, 'error');
                     endCall();
                 } else if (peerConnection.connectionState === 'disconnected') {
-                    addLog(`⚠️ Соединение разорвано`, 'warn');
+                    addLog(`⚠️ Разрыв соединения`, 'warn');
                     endCall();
                 }
             };
             
-            peerConnection.oniceconnectionstatechange = () => {
-                addLog(`🧊 ICE состояние: ${peerConnection.iceConnectionState}`, 'info');
-            };
-            
-            addLog(`📡 Создаем Offer...`);
             const offer = await peerConnection.createOffer();
             await peerConnection.setLocalDescription(offer);
-            addLog(`✅ Offer создан, отправляем...`);
+            addLog(`✅ Offer создан`);
             
-            const offerData = {
+            await db.ref(`calls/${targetId}/offer`).set({
                 offer: { type: offer.type, sdp: offer.sdp },
                 from: currentUser.id,
                 fromLogin: currentUser.login,
                 timestamp: Date.now()
-            };
-            await db.ref(`calls/${targetId}/offer`).set(offerData);
-            addLog(`✅ Offer отправлен в /calls/${targetId}/offer`, 'success');
+            });
+            addLog(`✅ Offer отправлен`, 'success');
             
             document.getElementById('callStatus').className = 'status ringing';
-            document.getElementById('callStatus').innerHTML = '📞 ЗВОНИМ... Ожидаем ответа';
+            document.getElementById('callStatus').innerHTML = '📞 ЗВОНИМ...';
             document.getElementById('callBtn').style.display = 'none';
             
-            // Ожидание ответа
             const answerRef = db.ref(`calls/${currentUser.id}/answer`);
             const timeout = setTimeout(() => {
                 if (!callActive) {
-                    addLog(`⏰ Таймаут: собеседник не ответил за 30 секунд`, 'warn');
+                    addLog(`⏰ Таймаут 30 сек - нет ответа`, 'warn');
                     endCall();
                 }
             }, 30000);
@@ -411,8 +447,8 @@
             answerRef.once('value', async (snap) => {
                 clearTimeout(timeout);
                 const answerData = snap.val();
-                if (answerData && !callActive && peerConnection) {
-                    addLog(`📡 Получен Answer, устанавливаем удаленное описание...`);
+                if (answerData && peerConnection && !peerConnection.remoteDescription) {
+                    addLog(`📡 Получен Answer`);
                     const answer = new RTCSessionDescription({
                         type: answerData.answer.type,
                         sdp: answerData.answer.sdp
@@ -421,9 +457,7 @@
                     await answerRef.remove();
                     addLog(`✅ Answer применен`, 'success');
                     
-                    // Подписываемся на ICE кандидаты от собеседника
-                    const candidatesRef = db.ref(`calls/${currentUser.id}/candidates`);
-                    candidatesRef.on('child_added', async (candSnap) => {
+                    db.ref(`calls/${currentUser.id}/candidates`).on('child_added', async (candSnap) => {
                         if (peerConnection && candSnap.val().from !== currentUser.id) {
                             const candData = candSnap.val().candidate;
                             const candidate = new RTCIceCandidate({
@@ -432,21 +466,20 @@
                                 sdpMLineIndex: candData.sdpMLineIndex
                             });
                             await peerConnection.addIceCandidate(candidate);
-                            addLog(`🧊 Добавлен удаленный ICE кандидат`);
                         }
                     });
                 }
             });
             
         } catch(e) {
-            addLog(`❌ Ошибка звонка: ${e.message}`, 'error');
+            addLog(`❌ Ошибка: ${e.message}`, 'error');
             endCall();
         }
     }
     
     async function acceptCall(fromUserId, offer) {
         try {
-            addLog(`🎤 Запрашиваем микрофон для ответа...`);
+            addLog(`🎤 Запрашиваем микрофон...`);
             localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
             addLog(`✅ Микрофон получен`, 'success');
             
@@ -455,19 +488,6 @@
             localStream.getTracks().forEach(track => {
                 peerConnection.addTrack(track, localStream);
             });
-            
-            peerConnection.ontrack = (event) => {
-                addLog(`📡 ПОЛУЧЕН АУДИОПОТОК от звонящего!`, 'success');
-                const audio = new Audio();
-                audio.srcObject = event.streams[0];
-                audio.play().catch(e => addLog(`⚠️ Автовоспроизведение: ${e.message}`, 'warn'));
-                callActive = true;
-                document.getElementById('callStatus').className = 'status active';
-                document.getElementById('callStatus').innerHTML = '🟢 ЗВОНОК АКТИВЕН';
-                document.getElementById('callBtn').style.display = 'none';
-                document.getElementById('endCallBtn').style.display = 'inline-block';
-                addLog(`🔊 Разговор начат!`, 'success');
-            };
             
             peerConnection.onicecandidate = (event) => {
                 if (event.candidate) {
@@ -484,20 +504,55 @@
                 }
             };
             
-            peerConnection.onconnectionstatechange = () => {
-                addLog(`🔗 Состояние: ${peerConnection.connectionState}`);
-                if (peerConnection.connectionState === 'failed' || peerConnection.connectionState === 'disconnected') {
-                    endCall();
-                }
+            peerConnection.ontrack = (event) => {
+                addLog(`📡 ПОЛУЧЕН АУДИОПОТОК от звонящего!`, 'success');
+                const audio = new Audio();
+                audio.srcObject = event.streams[0];
+                audio.volume = 1.0;
+                audio.autoplay = true;
+                
+                const tryPlay = async () => {
+                    try {
+                        await audio.play();
+                        addLog(`🔊 ЗВУК ВОСПРОИЗВОДИТСЯ!`, 'success');
+                        callActive = true;
+                        document.getElementById('callStatus').className = 'status active';
+                        document.getElementById('callStatus').innerHTML = '🟢 ЗВОНОК АКТИВЕН + ЗВУК';
+                        document.getElementById('callBtn').style.display = 'none';
+                        document.getElementById('endCallBtn').style.display = 'inline-block';
+                    } catch(e) {
+                        addLog(`⚠️ Автовоспроизведение заблокировано`, 'warn');
+                        addLog(`👉 Коснись экрана для активации звука`, 'warn');
+                        
+                        const activateSound = async () => {
+                            try {
+                                await audio.play();
+                                addLog(`✅ Звук активирован!`, 'success');
+                            } catch(e2) {}
+                            document.body.removeEventListener('touchstart', activateSound);
+                            document.body.removeEventListener('click', activateSound);
+                        };
+                        document.body.addEventListener('touchstart', activateSound, { once: true });
+                        document.body.addEventListener('click', activateSound, { once: true });
+                        
+                        callActive = true;
+                        document.getElementById('callStatus').innerHTML = '🟢 ЗВОНОК АКТИВЕН (нажми на экран)';
+                        document.getElementById('callBtn').style.display = 'none';
+                        document.getElementById('endCallBtn').style.display = 'inline-block';
+                    }
+                };
+                tryPlay();
             };
             
-            addLog(`📡 Устанавливаем удаленное описание (Offer)...`);
+            peerConnection.onconnectionstatechange = () => {
+                addLog(`🔗 Состояние: ${peerConnection.connectionState}`);
+            };
+            
             await peerConnection.setRemoteDescription(new RTCSessionDescription({
                 type: offer.type,
                 sdp: offer.sdp
             }));
             
-            addLog(`📡 Создаем Answer...`);
             const answer = await peerConnection.createAnswer();
             await peerConnection.setLocalDescription(answer);
             
@@ -507,12 +562,9 @@
                 fromLogin: currentUser.login,
                 timestamp: Date.now()
             });
-            
             addLog(`✅ Answer отправлен`, 'success');
             
-            // ICE кандидаты от звонящего
-            const candidatesRef = db.ref(`calls/${currentUser.id}/candidates`);
-            candidatesRef.on('child_added', async (snap) => {
+            db.ref(`calls/${currentUser.id}/candidates`).on('child_added', async (snap) => {
                 if (peerConnection && snap.val().from !== currentUser.id) {
                     const candData = snap.val().candidate;
                     const candidate = new RTCIceCandidate({
@@ -525,14 +577,13 @@
             });
             
         } catch(e) {
-            addLog(`❌ Ошибка принятия звонка: ${e.message}`, 'error');
+            addLog(`❌ Ошибка принятия: ${e.message}`, 'error');
             endCall();
         }
     }
     
     function endCall() {
         addLog(`🔴 Завершение звонка...`);
-        
         if (peerConnection) {
             peerConnection.close();
             peerConnection = null;
@@ -541,19 +592,14 @@
             localStream.getTracks().forEach(track => track.stop());
             localStream = null;
         }
-        
         callActive = false;
-        currentCallWith = null;
-        
         document.getElementById('callStatus').className = 'status inactive';
         document.getElementById('callStatus').innerHTML = '⚪ Ожидание';
         document.getElementById('callBtn').style.display = 'inline-block';
         document.getElementById('endCallBtn').style.display = 'none';
-        
         addLog(`✅ Звонок завершен`, 'info');
     }
     
-    // Автозагрузка при сохраненной сессии
     const saved = localStorage.getItem('user');
     if (saved) {
         currentUser = JSON.parse(saved);
@@ -561,10 +607,8 @@
         afterLogin();
     }
     
-    addLog(`🚀 ТЕСТОВЫЙ КЛИЕНТ ЗАПУЩЕН`, 'success');
-    addLog(`📌 Для теста: открой эту же страницу в двух браузерах/устройствах`, 'info');
-    addLog(`📌 Войди как 222 на одном, как 111 на другом`, 'info');
-    addLog(`📌 Нажми ПОЗВОНИТЬ - увидишь полный лог WebRTC`, 'call');
+    addLog(`🚀 ТЕСТ ЗВОНКОВ v2 ЗАПУЩЕН`, 'success');
+    addLog(`📌 Нажми "ТЕСТ МИКРОФОНА" и поговори`, 'call');
 </script>
 </body>
 </html>
