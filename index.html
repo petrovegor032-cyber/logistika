@@ -511,10 +511,14 @@
 <div id="chatContainer" class="chat-container">
     <div class="chat-header">
         <button class="btn-icon" onclick="closeChat()" style="background:none;">←</button>
-        <div style="flex:1"><div id="chatName" style="font-weight:bold"></div><div id="chatLogin" style="font-size:11px"></div></div>
+        <div style="flex:1">
+            <div id="chatName" style="font-weight:bold"></div>
+            <div id="chatLogin" style="font-size:11px"></div>
+        </div>
+        <div id="callStatus" style="font-size:11px; opacity:0.7; margin:0 8px;"></div>
         <button class="btn-icon" id="blockUserBtn" onclick="toggleBlockUser()">🚫</button>
         <button class="btn-icon" id="deleteChatBtn" onclick="deleteChat()">🗑️</button>
-        <button class="btn-icon" onclick="startCall()">📞</button>
+        <button class="btn-icon" id="callBtn" onclick="startCall()">📞</button>
         <button class="btn-icon btn-danger" id="endCallBtn" onclick="endCall()" style="display: none;">🔴</button>
     </div>
     <div class="messages" id="messages"></div>
