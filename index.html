@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>AudioDisk - РАЦИЯ (рабочая)</title>
+    <title>AudioDisk - РАЦИЯ (автовоспроизведение)</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -33,7 +33,6 @@
         }
         button.danger { background: #dc3545; }
         button.success { background: #28a745; }
-        button.primary { background: #2196f3; }
         input {
             width: 100%;
             padding: 12px;
@@ -63,21 +62,14 @@
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
         .mic-level { height: 4px; background: #4caf50; width: 0%; transition: width 0.1s; margin-top: 8px; border-radius: 2px; }
         .peer { border-left: 3px solid #667eea; padding-left: 16px; margin: 12px 0; cursor: pointer; }
-        .message-bubble {
-            background: rgba(102,126,234,0.3);
-            border-radius: 16px;
-            padding: 8px 12px;
-            margin: 4px 0;
-            font-size: 12px;
-        }
-        audio { width: 100%; margin-top: 4px; }
-        .sound-btn {
+        .activate-sound {
             background: #ff9800;
-            padding: 10px;
+            padding: 12px;
             text-align: center;
-            margin: 8px 0;
             border-radius: 40px;
+            margin-bottom: 12px;
             cursor: pointer;
+            font-weight: bold;
         }
     </style>
 </head>
@@ -101,6 +93,10 @@
             <div class="mic-level" id="micLevel"></div>
         </div>
         
+        <div id="soundActivation" class="activate-sound" style="display:none;">
+            🔊 НАЖМИ СЮДА ОДИН РАЗ ДЛЯ ВКЛЮЧЕНИЯ ЗВУКА
+        </div>
+        
         <div class="card">
             <h3>📞 Собеседник</h3>
             <input type="text" id="targetLogin" placeholder="Логин для связи">
@@ -113,11 +109,6 @@
         <div class="card">
             <h3>📋 Другие пользователи</h3>
             <div id="usersList"></div>
-        </div>
-        
-        <div class="card">
-            <h3>📋 СООБЩЕНИЯ</h3>
-            <div id="messagesList" class="log"></div>
         </div>
         
         <div class="card">
@@ -150,7 +141,8 @@
     let audioContext = null;
     let analyserNode = null;
     let animationFrame = null;
-    let pendingAudio = [];
+    let globalAudio = null;
+    let soundEnabled = false;
     
     function addLog(msg, type = 'info') {
         const logDiv = document.getElementById('log');
@@ -161,42 +153,26 @@
         console.log(`[${time}] ${msg}`);
     }
     
-    function addMessage(msg, type = 'in') {
-        const container = document.getElementById('messagesList');
-        const time = new Date().toLocaleTimeString();
-        const msgId = 'msg_' + Date.now() + '_' + Math.random();
-        
-        container.innerHTML += `<div class="message-bubble" style="background: ${type === 'out' ? 'rgba(102,126,234,0.5)' : 'rgba(255,255,255,0.1)'}" id="${msgId}">
-            <strong>${type === 'out' ? '📤 Я' : '📥 Собеседник'}</strong> ${time}
-            <div class="sound-btn" onclick="playAudioById('${msgId}')">🔊 НАЖМИ ДЛЯ ВОСПРОИЗВЕДЕНИЯ</div>
-        </div>`;
-        
-        // Сохраняем данные
-        const div = document.getElementById(msgId);
-        div.setAttribute('data-audio', msg.url);
-        
-        container.scrollTop = container.scrollHeight;
-    }
-    
-    function playAudioById(msgId) {
-        const div = document.getElementById(msgId);
-        const audioData = div.getAttribute('data-audio');
-        if (audioData) {
-            const audio = new Audio(audioData);
-            audio.volume = 1.0;
-            audio.play().then(() => {
-                addLog(`🔊 Воспроизведение начато`, 'success');
-                div.querySelector('.sound-btn').innerHTML = '🔊 ВОСПРОИЗВОДИТСЯ...';
-                setTimeout(() => {
-                    div.querySelector('.sound-btn').innerHTML = '🔊 ПРОСЛУШАНО';
-                }, 2000);
-            }).catch(e => addLog(`⚠️ Ошибка: ${e.message}`, 'warn'));
-        }
-    }
-    
     function clearLog() {
         document.getElementById('log').innerHTML = '';
         addLog('Лог очищен');
+    }
+    
+    function enableSound() {
+        if (soundEnabled) return;
+        soundEnabled = true;
+        if (globalAudio) {
+            globalAudio.play().then(() => {
+                addLog('✅ Звук активирован!', 'success');
+                document.getElementById('soundActivation').style.display = 'none';
+            }).catch(e => addLog(`⚠️ ${e.message}`, 'warn'));
+        } else {
+            globalAudio = new Audio();
+            globalAudio.volume = 1.0;
+            soundEnabled = true;
+            document.getElementById('soundActivation').style.display = 'none';
+            addLog('✅ Звук готов', 'success');
+        }
     }
     
     async function register() {
@@ -233,9 +209,19 @@
         document.getElementById('authPanel').style.display = 'none';
         document.getElementById('mainPanel').style.display = 'block';
         document.getElementById('myLogin').innerText = currentUser.login;
+        
+        // Создаем глобальный audio элемент
+        globalAudio = new Audio();
+        globalAudio.volume = 1.0;
+        
+        // Показываем кнопку активации звука
+        const activationDiv = document.getElementById('soundActivation');
+        activationDiv.style.display = 'block';
+        activationDiv.onclick = () => enableSound();
+        
         await loadUsers();
         setupRaciaListener();
-        addLog(`🎙️ Рация готова. Выбери собеседника и включи рацию.`, 'success');
+        addLog(`🎙️ Рация готова. Нажми на оранжевую кнопку для включения звука.`, 'success');
     }
     
     async function loadUsers() {
@@ -347,7 +333,7 @@
                         data: base64,
                         timestamp: Date.now()
                     });
-                    addMessage({ url: base64 }, 'out');
+                    addLog(`📤 Отправлено ${Math.round(blob.size/1000)}KB`, 'audio');
                 };
                 reader.readAsDataURL(blob);
             }
@@ -368,7 +354,16 @@
             const msg = snap.val();
             if (msg && msg.from !== currentUser.id) {
                 addLog(`📥 Получено от ${msg.fromLogin}`, 'audio');
-                addMessage({ url: msg.data }, 'in');
+                
+                if (soundEnabled && globalAudio) {
+                    globalAudio.src = msg.data;
+                    globalAudio.play().then(() => {
+                        addLog(`🔊 Автовоспроизведение`, 'success');
+                    }).catch(e => addLog(`⚠️ ${e.message}`, 'warn'));
+                } else {
+                    addLog(`🔇 Звук не активирован. Нажми оранжевую кнопку.`, 'warn');
+                }
+                
                 snap.ref.remove();
             }
         });
@@ -416,7 +411,7 @@
     }
     
     addLog(`🚀 РАЦИЯ ЗАПУЩЕНА`, 'success');
-    addLog(`📌 Голосовые сообщения приходят - НАЖМИ НА ОРАНЖЕВУЮ КНОПКУ для прослушивания`, 'info');
+    addLog(`📌 НАЖМИ НА ОРАНЖЕВУЮ КНОПКУ для активации звука`, 'info');
 </script>
 </body>
 </html>
