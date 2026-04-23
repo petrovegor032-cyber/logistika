@@ -123,10 +123,6 @@
             border: 2px solid white;
         }
         
-        .online-indicator.offline {
-            background: #888;
-        }
-        
         .chat-container {
             display: none;
             position: fixed;
@@ -165,7 +161,6 @@
             padding: 10px 14px;
             border-radius: 18px;
             word-wrap: break-word;
-            position: relative;
         }
         
         .message.out {
@@ -182,38 +177,6 @@
             font-size: 10px;
             opacity: 0.7;
             margin-top: 4px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        
-        .message-actions {
-            position: absolute;
-            top: -20px;
-            right: 0;
-            display: none;
-            gap: 4px;
-            background: rgba(0,0,0,0.7);
-            border-radius: 12px;
-            padding: 4px;
-        }
-        
-        .message:hover .message-actions {
-            display: flex;
-        }
-        
-        .message-action-btn {
-            background: none;
-            border: none;
-            color: white;
-            font-size: 14px;
-            cursor: pointer;
-            padding: 4px 8px;
-            border-radius: 8px;
-        }
-        
-        .message-action-btn:hover {
-            background: rgba(255,255,255,0.2);
         }
         
         .bottom-panel {
@@ -246,11 +209,6 @@
             color: white;
             font-size: 20px;
             cursor: pointer;
-            transition: transform 0.2s;
-        }
-        
-        .btn-icon:active {
-            transform: scale(0.95);
         }
         
         .btn-danger { background: #dc3545; }
@@ -324,14 +282,6 @@
             border-radius: 40px;
             font-size: 14px;
             z-index: 400;
-            animation: fadeInOut 2s ease;
-        }
-        
-        @keyframes fadeInOut {
-            0% { opacity: 0; transform: translateX(-50%) translateY(20px); }
-            15% { opacity: 1; transform: translateX(-50%) translateY(0); }
-            85% { opacity: 1; transform: translateX(-50%) translateY(0); }
-            100% { opacity: 0; transform: translateX(-50%) translateY(20px); }
         }
         
         .ad-card {
@@ -387,11 +337,6 @@
             border-radius: 16px;
             cursor: pointer;
             text-align: center;
-            transition: all 0.3s;
-        }
-        
-        .menu-item:active {
-            transform: scale(0.98);
         }
         
         .menu-item.danger {
@@ -497,15 +442,6 @@
             padding: 8px;
         }
         
-        .delete-chat {
-            background: none;
-            border: none;
-            color: #ff4444;
-            font-size: 20px;
-            cursor: pointer;
-            padding: 8px;
-        }
-        
         .contact-actions {
             display: flex;
             align-items: center;
@@ -532,36 +468,6 @@
             border-radius: 8px;
             display: inline-block;
         }
-        
-        .loading-spinner {
-            text-align: center;
-            padding: 20px;
-            color: rgba(255,255,255,0.6);
-        }
-        
-        .search-input {
-            background: rgba(255,255,255,0.1);
-            border: 1px solid rgba(255,255,255,0.2);
-            color: white;
-            padding: 8px 12px;
-            border-radius: 20px;
-            width: 100%;
-        }
-        
-        .message-search-results {
-            position: absolute;
-            top: 60px;
-            right: 10px;
-            background: rgba(0,0,0,0.9);
-            border-radius: 12px;
-            padding: 8px;
-            max-width: 250px;
-            z-index: 100;
-        }
-        
-        button {
-            transition: all 0.2s;
-        }
     </style>
 </head>
 <body>
@@ -571,7 +477,6 @@
 <div class="header">
     <button class="menu-btn" onclick="toggleMenu()">☰</button>
     <h2>✨ AudioDisk</h2>
-    <button class="menu-btn" onclick="openSearchInChat()" style="font-size: 20px;">🔍</button>
 </div>
 
 <div id="page-main" class="page active">
@@ -601,18 +506,16 @@
         <div style="flex:1"><div id="chatName" style="font-weight:bold"></div><div id="chatLogin" style="font-size:11px"></div></div>
         <button class="btn-icon" id="blockUserBtn" onclick="toggleBlockUser()">🚫</button>
         <button class="btn-icon" id="deleteChatBtn" onclick="deleteChat()">🗑️</button>
-        <button class="btn-icon" id="callBtn" onclick="startCall()">📞</button>
+        <button class="btn-icon" onclick="startCall()">📞</button>
         <button class="btn-icon btn-danger" id="endCallBtn" onclick="endCall()" style="display: none;">🔴</button>
     </div>
-    <div class="messages" id="messages">
-        <div class="loading-spinner">⏳ Загрузка сообщений...</div>
-    </div>
+    <div class="messages" id="messages"></div>
     <div class="bottom-panel">
         <button class="btn-icon" onclick="selectFile()">📎</button>
         <button class="btn-icon" id="recordBtn" onclick="toggleRecording()">🎤</button>
         <textarea class="message-input" id="messageInput" placeholder="Сообщение" rows="1"></textarea>
         <button class="btn-icon" onclick="sendMessage()">✏️</button>
-        <input type="file" id="fileInput" style="display:none" accept="image/*,video/*,audio/*,application/*">
+        <input type="file" id="fileInput" style="display:none" accept="*/*">
     </div>
 </div>
 
@@ -743,24 +646,6 @@
     </div>
 </div>
 
-<div id="editMessageModal" class="modal">
-    <div class="modal-content">
-        <span class="modal-close" onclick="closeModal('editMessageModal')">✕</span>
-        <h3>✏️ Редактировать сообщение</h3>
-        <textarea id="editMessageText" rows="3" placeholder="Новый текст"></textarea>
-        <button class="btn-icon" onclick="saveMessageEdit()" style="width:100%">Сохранить</button>
-    </div>
-</div>
-
-<div id="searchMessagesModal" class="modal">
-    <div class="modal-content">
-        <span class="modal-close" onclick="closeModal('searchMessagesModal')">✕</span>
-        <h3>🔍 Поиск в чате</h3>
-        <input type="text" id="messageSearchInput" placeholder="Поиск...">
-        <div id="messageSearchResults" style="max-height: 300px; overflow-y: auto; margin-top: 12px;"></div>
-    </div>
-</div>
-
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
@@ -794,8 +679,6 @@
     let localStream = null;
     let peerConnection = null;
     let callActive = false;
-    let editingMessageId = null;
-    let onlineStatusListeners = {};
     
     // ========== ИСКОРКИ ==========
     function initSparks() {
@@ -887,25 +770,7 @@
     
     function requestNotificationPermission() {
         if ('Notification' in window) {
-            Notification.requestPermission().then(permission => {
-                console.log('🔔 Разрешение на уведомления:', permission);
-            });
-        }
-    }
-    
-    function showNotification(title, body) {
-        if (!('Notification' in window)) return;
-        if (Notification.permission !== 'granted') return;
-        
-        if (document.hidden) {
-            new Notification(title, {
-                body: body,
-                icon: 'https://petrovegor032-cyber.github.io/logistika/favicon.ico',
-                tag: 'message',
-                vibrate: [200, 100, 200]
-            });
-        } else {
-            showToast(`📨 ${title}: ${body.substring(0, 50)}`);
+            Notification.requestPermission();
         }
     }
     
@@ -945,10 +810,6 @@
         initMap();
         loadData();
         setupMessageListener();
-        setupNotificationListener();
-        setupOnlineStatusListener();
-        setupCallListener();
-        requestNotificationPermission();
         showToast('Регистрация успешна!');
     }
     
@@ -971,10 +832,6 @@
         initMap();
         loadData();
         setupMessageListener();
-        setupNotificationListener();
-        setupOnlineStatusListener();
-        setupCallListener();
-        requestNotificationPermission();
         showToast('Добро пожаловать!');
     }
     
@@ -986,9 +843,6 @@
             initMap();
             loadData();
             setupMessageListener();
-            setupNotificationListener();
-            setupOnlineStatusListener();
-            setupCallListener();
             requestNotificationPermission();
         } else {
             openModal('authModal');
@@ -1005,39 +859,6 @@
     
     async function deleteAccount() {
         if (!confirm('Вы уверены? Ваш аккаунт и все данные будут удалены безвозвратно!')) return;
-        
-        const messagesSnap = await db.ref(`messages/${currentUser.id}`).once('value');
-        if (messagesSnap.exists()) {
-            for (const [contactId, msgs] of Object.entries(messagesSnap.val())) {
-                for (const msgId of Object.keys(msgs)) {
-                    await db.ref(`messages/${contactId}/${currentUser.id}/${msgId}`).remove();
-                }
-            }
-            await db.ref(`messages/${currentUser.id}`).remove();
-        }
-        
-        const contactsSnap = await db.ref(`contacts/${currentUser.id}`).once('value');
-        if (contactsSnap.exists()) {
-            for (const contactId of Object.keys(contactsSnap.val())) {
-                await db.ref(`contacts/${contactId}/${currentUser.id}`).remove();
-            }
-            await db.ref(`contacts/${currentUser.id}`).remove();
-        }
-        
-        const adsSnap = await db.ref('ads').orderByChild('userId').equalTo(currentUser.id).once('value');
-        if (adsSnap.exists()) {
-            for (const adId of Object.keys(adsSnap.val())) {
-                await db.ref(`ads/${adId}`).remove();
-            }
-        }
-        
-        const blockedSnap = await db.ref(`blocked/${currentUser.id}`).once('value');
-        if (blockedSnap.exists()) {
-            for (const blockedId of Object.keys(blockedSnap.val())) {
-                await db.ref(`blocked/${blockedId}/${currentUser.id}`).remove();
-            }
-            await db.ref(`blocked/${currentUser.id}`).remove();
-        }
         
         await db.ref(`users/${currentUser.id}`).remove();
         showToast('Аккаунт удалён');
@@ -1083,93 +904,6 @@
         showToast('Чат удалён');
         closeChat();
         loadChats();
-    }
-    
-    // ========== РЕДАКТИРОВАНИЕ СООБЩЕНИЙ ==========
-    function editMessage(msgId, currentText) {
-        editingMessageId = msgId;
-        document.getElementById('editMessageText').value = currentText;
-        openModal('editMessageModal');
-    }
-    
-    async function saveMessageEdit() {
-        const newText = document.getElementById('editMessageText').value.trim();
-        if (!newText || !editingMessageId || !currentChat) return;
-        
-        const updateData = {
-            content: newText,
-            edited: true,
-            editedAt: Date.now()
-        };
-        
-        await db.ref(`messages/${currentUser.id}/${currentChat.id}/${editingMessageId}`).update(updateData);
-        await db.ref(`messages/${currentChat.id}/${currentUser.id}/${editingMessageId}`).update(updateData);
-        
-        closeModal('editMessageModal');
-        editingMessageId = null;
-        await loadMessages();
-        showToast('Сообщение отредактировано');
-    }
-    
-    async function deleteMessage(msgId) {
-        if (!confirm('Удалить сообщение?')) return;
-        
-        await db.ref(`messages/${currentUser.id}/${currentChat.id}/${msgId}`).remove();
-        await db.ref(`messages/${currentChat.id}/${currentUser.id}/${msgId}`).remove();
-        
-        await loadMessages();
-        showToast('Сообщение удалено');
-    }
-    
-    // ========== ПОИСК В ЧАТЕ ==========
-    function openSearchInChat() {
-        if (!currentChat) {
-            showToast('Сначала откройте чат');
-            return;
-        }
-        openModal('searchMessagesModal');
-        document.getElementById('messageSearchInput').value = '';
-        document.getElementById('messageSearchResults').innerHTML = '';
-        
-        document.getElementById('messageSearchInput').oninput = async (e) => {
-            const query = e.target.value.toLowerCase();
-            if (!query || query.length < 2) {
-                document.getElementById('messageSearchResults').innerHTML = '';
-                return;
-            }
-            
-            const snapshot = await db.ref(`messages/${currentUser.id}/${currentChat.id}`).once('value');
-            const results = [];
-            snapshot.forEach(child => {
-                const msg = child.val();
-                if (msg.type === 'text' && msg.content.toLowerCase().includes(query)) {
-                    results.push({ id: child.key, ...msg });
-                }
-            });
-            
-            document.getElementById('messageSearchResults').innerHTML = results.map(r => `
-                <div class="ad-card" onclick="scrollToMessage('${r.id}')">
-                    <div>${escapeHtml(r.content.substring(0, 100))}</div>
-                    <small>${new Date(r.timestamp).toLocaleString()}</small>
-                </div>
-            `).join('');
-            
-            if (results.length === 0) {
-                document.getElementById('messageSearchResults').innerHTML = '<div style="text-align:center; padding:20px;">❌ Ничего не найдено</div>';
-            }
-        };
-    }
-    
-    function scrollToMessage(msgId) {
-        closeModal('searchMessagesModal');
-        const element = document.getElementById(`msg-${msgId}`);
-        if (element) {
-            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            element.style.backgroundColor = 'rgba(255,255,0,0.2)';
-            setTimeout(() => {
-                element.style.backgroundColor = '';
-            }, 2000);
-        }
     }
     
     // ========== ПРОФИЛЬ ==========
@@ -1242,82 +976,6 @@
         openModal('statusModal');
     }
     
-    // ========== ОНЛАЙН СТАТУС ==========
-    function setupOnlineStatusListener() {
-        if (!currentUser) return;
-        
-        const usersRef = db.ref('users');
-        usersRef.on('child_changed', (snap) => {
-            const userData = snap.val();
-            updateOnlineIndicator(snap.key, userData.online);
-        });
-    }
-    
-    function updateOnlineIndicator(userId, isOnline) {
-        const indicators = document.querySelectorAll(`.contact-item[data-user-id="${userId}"] .online-indicator`);
-        indicators.forEach(indicator => {
-            if (isOnline) {
-                indicator.classList.remove('offline');
-            } else {
-                indicator.classList.add('offline');
-            }
-        });
-    }
-    
-    // ========== АВТОДОБАВЛЕНИЕ КОНТАКТОВ ==========
-    async function ensureContactAndChat(receiverId, receiverName, receiverLogin) {
-        const contactExists = await db.ref(`contacts/${currentUser.id}/${receiverId}`).once('value');
-        
-        if (!contactExists.exists()) {
-            await db.ref(`contacts/${currentUser.id}/${receiverId}`).set({
-                name: receiverName || receiverLogin,
-                login: receiverLogin,
-                added_at: Date.now(),
-                auto_added: true
-            });
-            
-            await db.ref(`notifications/${receiverId}/${currentUser.id}`).set({
-                type: 'new_chat',
-                from: currentUser.id,
-                fromName: currentUser.name,
-                fromLogin: currentUser.login,
-                timestamp: Date.now(),
-                read: false
-            });
-            
-            showToast(`✅ ${receiverName || receiverLogin} добавлен в контакты автоматически`);
-            await loadContacts();
-            return true;
-        }
-        return false;
-    }
-    
-    function setupNotificationListener() {
-        if (!currentUser) return;
-        
-        db.ref(`notifications/${currentUser.id}`).on('child_added', async (snap) => {
-            const notif = snap.val();
-            if (notif.type === 'new_chat' && !notif.read) {
-                const contactExists = await db.ref(`contacts/${currentUser.id}/${notif.from}`).once('value');
-                
-                if (!contactExists.exists()) {
-                    await db.ref(`contacts/${currentUser.id}/${notif.from}`).set({
-                        name: notif.fromName,
-                        login: notif.fromLogin,
-                        added_at: Date.now(),
-                        auto_added: true
-                    });
-                    
-                    showToast(`📨 Новый чат от ${notif.fromName}`);
-                    await loadContacts();
-                    await loadChats();
-                }
-                
-                await snap.ref.update({ read: true });
-            }
-        });
-    }
-    
     // ========== КАРТА ==========
     function initMap() {
         if (map) return;
@@ -1347,37 +1005,48 @@
     function selectAdIcon(icon) {
         selectedAdIcon = icon;
         document.querySelectorAll('.icon-option').forEach(opt => opt.classList.remove('selected'));
-        event.target.classList.add('selected');
+        if (event && event.target) event.target.classList.add('selected');
     }
     
     async function createAd() {
         const text = document.getElementById('adText').value.trim();
         const price = document.getElementById('adPrice').value.trim();
         if (!text) return showToast('Введите текст объявления');
-        if (!userMarker) return showToast('Включите геолокацию');
         
-        const pos = userMarker.getLatLng();
-        let photoUrl = '';
-        const photoFile = document.getElementById('adPhoto').files[0];
-        if (photoFile) {
-            const storageRef = storage.ref(`ads/${Date.now()}_${photoFile.name}`);
-            await storageRef.put(photoFile);
-            photoUrl = await storageRef.getDownloadURL();
-        }
+        if (!navigator.geolocation) return showToast('Геолокация не поддерживается');
         
-        await db.ref(`ads/${Date.now()}`).set({
-            icon: selectedAdIcon, text, price, photoUrl,
-            lat: pos.lat, lng: pos.lng,
-            userId: currentUser.id, userLogin: currentUser.login,
-            timestamp: Date.now()
+        navigator.geolocation.getCurrentPosition(async (position) => {
+            const { latitude, longitude } = position.coords;
+            
+            let photoUrl = '';
+            const photoFile = document.getElementById('adPhoto').files[0];
+            if (photoFile) {
+                try {
+                    const storageRef = storage.ref(`ads/${Date.now()}_${photoFile.name}`);
+                    await storageRef.put(photoFile);
+                    photoUrl = await storageRef.getDownloadURL();
+                } catch(e) {
+                    console.error('Ошибка фото:', e);
+                }
+            }
+            
+            await db.ref(`ads/${Date.now()}`).set({
+                icon: selectedAdIcon, text, price, photoUrl,
+                lat: latitude, lng: longitude,
+                userId: currentUser.id, userLogin: currentUser.login,
+                timestamp: Date.now()
+            });
+            
+            showToast('✅ Объявление опубликовано');
+            closeModal('addAdModal');
+            document.getElementById('adText').value = '';
+            document.getElementById('adPrice').value = '';
+            document.getElementById('adPhoto').value = '';
+            await loadAds();
+        }, (error) => {
+            console.error('Ошибка геолокации:', error);
+            showToast('❌ Включите геолокацию для публикации');
         });
-        
-        showToast('Объявление опубликовано');
-        closeModal('addAdModal');
-        document.getElementById('adText').value = '';
-        document.getElementById('adPrice').value = '';
-        document.getElementById('adPhoto').value = '';
-        await loadAds();
     }
     
     async function loadAds() {
@@ -1399,18 +1068,14 @@
                     <div style="flex:1">
                         <b>${escapeHtml(ad.text)}</b><br>
                         ${ad.price ? `<small>💰 ${ad.price}₽</small><br>` : ''}
-                        <small>📍 ${ad.lat?.toFixed(4) || '0'}, ${ad.lng?.toFixed(4) || '0'}</small><br>
                         <small>👤 ${escapeHtml(ad.userLogin)}</small>
                     </div>
                     ${ad.userId === currentUser?.id ? `
-                        <div>
-                            <button onclick="event.stopPropagation(); editAd('${ad.id}')" style="background:none; border:none; font-size:20px;">✏️</button>
-                            <button onclick="event.stopPropagation(); deleteAd('${ad.id}')" style="background:none; border:none; font-size:20px;">🗑️</button>
-                        </div>
+                        <button onclick="event.stopPropagation(); deleteAd('${ad.id}')" style="background:none; border:none; font-size:20px;">🗑️</button>
                     ` : ''}
                 </div>
                 ${ad.photoUrl ? `<img src="${ad.photoUrl}" style="max-width:100%; border-radius:12px; margin-top:8px;">` : ''}
-                <button onclick="event.stopPropagation(); openChatFromAd('${ad.userId}', '${escapeHtml(ad.userLogin)}')" style="margin-top:8px; background:rgba(102,126,234,0.5); border:none; padding:8px; border-radius:20px; color:white;">💬 Написать автору</button>
+                <button onclick="event.stopPropagation(); openChatFromAd('${ad.userId}')" style="margin-top:8px; background:rgba(102,126,234,0.5); border:none; padding:8px; border-radius:20px; color:white;">💬 Написать автору</button>
             </div>
         `).join('');
         
@@ -1421,24 +1086,9 @@
                 const marker = L.marker([ad.lat, ad.lng], {
                     icon: L.divIcon({ html: `<div style="font-size:32px;">${ad.icon || '📌'}</div>`, iconSize: [35, 35] })
                 }).addTo(map);
-                marker.bindPopup(`
-                    <b>${escapeHtml(ad.text)}</b><br>
-                    ${ad.price ? `💰 ${ad.price}₽<br>` : ''}
-                    <button onclick="openChatFromAd('${ad.userId}', '${escapeHtml(ad.userLogin)}')">💬 Написать</button>
-                `);
+                marker.bindPopup(`<b>${escapeHtml(ad.text)}</b><br><button onclick="openChatFromAd('${ad.userId}')">💬 Написать</button>`);
                 markers.push(marker);
             });
-        }
-    }
-    
-    async function editAd(adId) {
-        const ad = allAds.find(a => a.id === adId);
-        if (!ad) return;
-        const newText = prompt('Редактировать текст:', ad.text);
-        if (newText) {
-            await db.ref(`ads/${adId}/text`).set(newText);
-            await loadAds();
-            showToast('Объявление обновлено');
         }
     }
     
@@ -1468,10 +1118,7 @@
                         ${ad.price ? `💰 ${ad.price}₽<br>` : ''}
                         <small>⏱️ ${Math.floor((Date.now() - ad.timestamp) / 1000 / 60 / 60)} ч назад</small>
                     </div>
-                    <div>
-                        <button onclick="editAd('${ad.id}'); closeModal('myAdsModal')" style="background:none; border:none; font-size:20px;">✏️</button>
-                        <button onclick="deleteAd('${ad.id}'); closeModal('myAdsModal')" style="background:none; border:none; font-size:20px;">🗑️</button>
-                    </div>
+                    <button onclick="deleteAd('${ad.id}'); closeModal('myAdsModal')" style="background:none; border:none; font-size:20px;">🗑️</button>
                 </div>
                 ${ad.photoUrl ? `<img src="${ad.photoUrl}" style="max-width:100%; border-radius:12px; margin-top:8px;">` : ''}
             </div>
@@ -1480,7 +1127,7 @@
         openModal('myAdsModal');
     }
     
-    async function openChatFromAd(userId, userLogin) {
+    async function openChatFromAd(userId) {
         closeModal('myAdsModal');
         closeModal('addAdModal');
         
@@ -1492,15 +1139,69 @@
             return;
         }
         
-        const contact = { id: userId, login: userLogin, name: userData.name, avatar: userData.avatar || '👤' };
+        const contact = { id: userId, login: userData.login, name: userData.name, avatar: userData.avatar || '👤' };
         
-        await ensureContactAndChat(userId, userData.name, userLogin);
+        // Автоматически добавляем в контакты
+        const contactExists = await db.ref(`contacts/${currentUser.id}/${userId}`).once('value');
+        if (!contactExists.exists()) {
+            await db.ref(`contacts/${currentUser.id}/${userId}`).set({
+                name: userData.name,
+                login: userData.login,
+                added_at: Date.now()
+            });
+            showToast(`✅ ${userData.name} добавлен в контакты`);
+            await loadContacts();
+        }
         
         switchPage('main');
         openChat(contact);
     }
     
     // ========== КОНТАКТЫ ==========
+    async function addContact() {
+        const login = document.getElementById('contactLoginInput').value.trim();
+        if (!login) {
+            showToast('Введите логин');
+            return;
+        }
+        
+        const snapshot = await db.ref('users').orderByChild('login').equalTo(login).once('value');
+        if (!snapshot.exists()) {
+            showToast('❌ Пользователь не найден');
+            return;
+        }
+        
+        let contactId, contactData;
+        snapshot.forEach(child => {
+            contactId = child.key;
+            contactData = child.val();
+        });
+        
+        if (contactId === currentUser.id) {
+            showToast('❌ Нельзя добавить себя');
+            return;
+        }
+        
+        const existing = await db.ref(`contacts/${currentUser.id}/${contactId}`).once('value');
+        if (existing.exists()) {
+            showToast('⚠️ Контакт уже существует');
+            closeModal('addContactModal');
+            return;
+        }
+        
+        await db.ref(`contacts/${currentUser.id}/${contactId}`).set({
+            name: contactData.name || login,
+            login: login,
+            added_at: Date.now()
+        });
+        
+        showToast(`✅ ${contactData.name || login} добавлен в контакты`);
+        closeModal('addContactModal');
+        document.getElementById('contactLoginInput').value = '';
+        await loadContacts();
+        await loadChats();
+    }
+    
     async function loadContacts() {
         const snapshot = await db.ref(`contacts/${currentUser.id}`).once('value');
         contacts = [];
@@ -1542,6 +1243,25 @@
         await loadChats();
     }
     
+    function renderContacts() {
+        const search = document.getElementById('contactSearch')?.value?.toLowerCase() || '';
+        const filtered = contacts.filter(c => c.name.toLowerCase().includes(search));
+        document.getElementById('contactsList').innerHTML = filtered.map(c => `
+            <div class="contact-item" onclick='openChat(${JSON.stringify(c).replace(/"/g, '&quot;')})'>
+                <div class="contact-avatar">${c.avatar}<span class="online-indicator"></span></div>
+                <div style="flex:1">
+                    <b>${escapeHtml(c.name)}</b><br>
+                    <small>@${c.login}</small>
+                </div>
+                <div class="contact-actions">
+                    <button class="edit-contact" onclick="editContact(${JSON.stringify(c).replace(/"/g, '&quot;')}, event)">✏️</button>
+                    <button class="delete-contact" onclick="deleteContact('${c.id}', event)">🗑️</button>
+                </div>
+            </div>
+        `).join('');
+    }
+    
+    // ========== ЧАТЫ ==========
     function setupMessageListener() {
         if (!currentUser) return;
         
@@ -1558,65 +1278,17 @@
                 const lastMsg = Object.values(msgs).sort((a, b) => b.timestamp - a.timestamp)[0];
                 
                 if (lastMsg && lastMsg.from !== currentUser.id) {
-                    const isChatOpen = (currentChat && currentChat.id === contactId);
-                    if (!isChatOpen) {
-                        showNotification(contact.name, lastMsg.content?.substring(0, 100) || '📎 Файл или 🎤 Аудио');
-                    } else {
-                        showToast(`📨 ${contact.name}: ${lastMsg.content?.substring(0, 50) || 'Файл или аудио'}`);
-                    }
+                    showToast(`📨 ${contact.name}: ${lastMsg.content?.substring(0, 50) || 'Файл'}`);
                 }
             }
             
             await loadChats();
             if (currentChat && contactId === currentChat.id && !isBlocked(contactId)) {
-                await loadMessages();
+                loadMessages();
             }
         });
     }
     
-    async function addContact() {
-        const login = document.getElementById('contactLoginInput').value.trim();
-        if (!login) return;
-        const snapshot = await db.ref('users').orderByChild('login').equalTo(login).once('value');
-        if (!snapshot.exists()) return showToast('Пользователь не найден');
-        let contactId;
-        let contactData;
-        snapshot.forEach(child => { contactId = child.key; contactData = child.val(); });
-        if (contactId === currentUser.id) return showToast('Нельзя добавить себя');
-        if (isBlocked(contactId)) return showToast('Этот пользователь заблокирован');
-        
-        await db.ref(`contacts/${currentUser.id}/${contactId}`).set({ name: contactData.name || login, login: login, added_at: Date.now() });
-        showToast('Контакт добавлен');
-        closeModal('addContactModal');
-        await loadContacts();
-        await loadChats();
-    }
-    
-    function renderContacts() {
-        const search = document.getElementById('contactSearch')?.value?.toLowerCase() || '';
-        const filtered = contacts.filter(c => c.name.toLowerCase().includes(search) && !isBlocked(c.id));
-        document.getElementById('contactsList').innerHTML = filtered.map(c => `
-            <div class="contact-item" data-user-id="${c.id}" onclick='openChat(${JSON.stringify(c).replace(/"/g, '&quot;')})'>
-                <div class="contact-avatar">${c.avatar}<span class="online-indicator"></span></div>
-                <div style="flex:1">
-                    <b>${escapeHtml(c.name)}</b><br>
-                    <small>@${c.login}</small>
-                </div>
-                <div class="contact-actions">
-                    <button class="edit-contact" onclick="editContact(${JSON.stringify(c).replace(/"/g, '&quot;')}, event)">✏️</button>
-                    <button class="delete-contact" onclick="deleteContact('${c.id}', event)">🗑️</button>
-                </div>
-            </div>
-        `).join('');
-        
-        filtered.forEach(c => {
-            db.ref(`users/${c.id}/online`).once('value', snap => {
-                updateOnlineIndicator(c.id, snap.val());
-            });
-        });
-    }
-    
-    // ========== ЧАТЫ ==========
     async function loadChats() {
         await loadBlockedUsers();
         
@@ -1639,27 +1311,21 @@
         const search = document.getElementById('chatSearch')?.value?.toLowerCase() || '';
         const filtered = chats.filter(c => c.contact.name.toLowerCase().includes(search));
         document.getElementById('chatsList').innerHTML = filtered.map(c => `
-            <div class="contact-item" data-user-id="${c.contact.id}" onclick='openChat(${JSON.stringify(c.contact).replace(/"/g, '&quot;')})'>
+            <div class="contact-item" onclick='openChat(${JSON.stringify(c.contact).replace(/"/g, '&quot;')})'>
                 <div class="contact-avatar">${c.contact.avatar}<span class="online-indicator"></span></div>
                 <div style="flex:1">
                     <b>${escapeHtml(c.contact.name)}</b><br>
-                    <small>${c.lastMsg.type === 'text' ? (c.lastMsg.content || '').substring(0, 30) : (c.lastMsg.type === 'audio' ? '🎤 Аудио' : (c.lastMsg.type === 'file' ? '📎 Файл' : (c.lastMsg.type === 'photo' ? '🖼️ Фото' : '📎 Вложение')))}</small>
+                    <small>${c.lastMsg.type === 'text' ? (c.lastMsg.content || '').substring(0, 30) : '📎 Вложение'}</small>
                 </div>
                 <small>${new Date(c.lastMsg.timestamp).toLocaleTimeString()}</small>
             </div>
         `).join('');
-        
-        filtered.forEach(c => {
-            db.ref(`users/${c.contact.id}/online`).once('value', snap => {
-                updateOnlineIndicator(c.contact.id, snap.val());
-            });
-        });
     }
     
     function openChat(contact) {
         if (!contact) return;
         if (isBlocked(contact.id)) {
-            showToast(`🔒 ${contact.name} заблокирован. Разблокируйте в чате.`);
+            showToast(`🔒 ${contact.name} заблокирован`);
             return;
         }
         
@@ -1668,8 +1334,7 @@
         document.getElementById('chatLogin').innerText = '@' + contact.login;
         
         const isBlockedUser = blockedUsers.includes(contact.id);
-        const blockBtn = document.getElementById('blockUserBtn');
-        blockBtn.style.background = isBlockedUser ? '#dc3545' : 'linear-gradient(135deg, #667eea, #764ba2)';
+        document.getElementById('blockUserBtn').style.background = isBlockedUser ? '#dc3545' : 'linear-gradient(135deg, #667eea, #764ba2)';
         
         document.getElementById('chatContainer').classList.add('active');
         
@@ -1679,10 +1344,7 @@
             if (!isBlocked(contact.id)) loadMessages();
         });
         
-        loadMessages().then(() => {
-            const container = document.getElementById('messages');
-            if (container) container.scrollTop = container.scrollHeight;
-        });
+        loadMessages();
     }
     
     function closeChat() {
@@ -1695,77 +1357,54 @@
         document.getElementById('chatContainer').classList.remove('active');
     }
     
-    function formatMessageContent(msg, msgId) {
-        let content = '';
-        if (msg.type === 'text') content = escapeHtml(msg.content) + (msg.edited ? ' <small>(ред.)</small>' : '');
-        if (msg.type === 'audio') content = `<audio controls src="${msg.content}" class="audio-player"></audio>`;
-        if (msg.type === 'photo') content = `<img src="${msg.content}" class="message-image" onclick="window.open('${msg.content}','_blank')">`;
-        if (msg.type === 'video') content = `<video controls src="${msg.content}" class="message-video"></video>`;
-        if (msg.type === 'file') content = `<a href="${msg.content}" download="${msg.name}" class="message-file">📎 ${escapeHtml(msg.name)}</a>`;
-        
-        if (msg.from === currentUser.id && msg.type === 'text') {
-            content += `
-                <div class="message-actions">
-                    <button class="message-action-btn" onclick="editMessage('${msgId}', '${escapeHtml(msg.content).replace(/'/g, "\\'")}')">✏️</button>
-                    <button class="message-action-btn" onclick="deleteMessage('${msgId}')">🗑️</button>
-                </div>
-            `;
-        } else if (msg.from === currentUser.id) {
-            content += `
-                <div class="message-actions">
-                    <button class="message-action-btn" onclick="deleteMessage('${msgId}')">🗑️</button>
-                </div>
-            `;
-        }
-        
-        return content;
-    }
-    
     async function loadMessages() {
         if (!currentChat || isBlocked(currentChat.id)) {
-            const container = document.getElementById('messages');
-            if (container) container.innerHTML = '<div style="text-align:center; padding:40px;">💬 Чат недоступен</div>';
+            document.getElementById('messages').innerHTML = '<div style="text-align:center; padding:40px;">💬 Чат недоступен</div>';
             return;
         }
         
-        const container = document.getElementById('messages');
-        container.innerHTML = '<div class="loading-spinner">⏳ Загрузка сообщений...</div>';
+        const snapshot = await db.ref(`messages/${currentUser.id}/${currentChat.id}`).orderByKey().limitToLast(50).once('value');
+        const messages = [];
+        snapshot.forEach(child => {
+            messages.push({ id: child.key, ...child.val() });
+        });
+        messages.sort((a, b) => a.timestamp - b.timestamp);
         
-        try {
-            const snapshot = await db.ref(`messages/${currentUser.id}/${currentChat.id}`).orderByKey().limitToLast(50).once('value');
-            const messages = [];
-            snapshot.forEach(child => {
-                messages.push({ id: child.key, ...child.val() });
-            });
-            messages.sort((a, b) => a.timestamp - b.timestamp);
-            
-            if (messages.length === 0) {
-                container.innerHTML = '<div style="text-align:center; padding:40px;">💬 Нет сообщений</div>';
-            } else {
-                container.innerHTML = messages.map(msg => `
-                    <div class="message ${msg.from === currentUser.id ? 'out' : 'in'}" id="msg-${msg.id}">
-                        <div>${formatMessageContent(msg, msg.id)}</div>
-                        <div class="message-meta">
-                            <span>${msg.from === currentUser.id ? 'Вы' : currentChat.name}</span>
-                            <span>${new Date(msg.timestamp).toLocaleTimeString()}</span>
-                        </div>
-                    </div>
-                `).join('');
-            }
-        } catch(e) {
-            console.error('Ошибка загрузки сообщений:', e);
-            container.innerHTML = '<div style="text-align:center; padding:40px;">❌ Ошибка загрузки сообщений</div>';
+        const container = document.getElementById('messages');
+        if (messages.length === 0) {
+            container.innerHTML = '<div style="text-align:center; padding:40px;">💬 Нет сообщений</div>';
+        } else {
+            container.innerHTML = messages.map(msg => `
+                <div class="message ${msg.from === currentUser.id ? 'out' : 'in'}">
+                    <div>${msg.type === 'text' ? escapeHtml(msg.content) : 
+                         msg.type === 'audio' ? `<audio controls src="${msg.content}" class="audio-player"></audio>` :
+                         msg.type === 'photo' ? `<img src="${msg.content}" class="message-image" onclick="window.open('${msg.content}','_blank')">` :
+                         msg.type === 'file' ? `<a href="${msg.content}" download="${msg.name}" class="message-file">📎 ${escapeHtml(msg.name)}</a>` : msg.content}</div>
+                    <div class="message-meta">${msg.from === currentUser.id ? 'Вы' : currentChat.name} • ${new Date(msg.timestamp).toLocaleTimeString()}</div>
+                </div>
+            `).join('');
         }
+        container.scrollTop = container.scrollHeight;
     }
     
     async function sendMessage() {
         const text = document.getElementById('messageInput').value.trim();
         if (!text || !currentChat || isBlocked(currentChat.id)) return;
         
-        const userSnap = await db.ref(`users/${currentChat.id}`).once('value');
-        const userData = userSnap.val();
-        if (userData) {
-            await ensureContactAndChat(currentChat.id, userData.name, userData.login);
+        // Автоматически добавляем в контакты если нет
+        const contactExists = await db.ref(`contacts/${currentUser.id}/${currentChat.id}`).once('value');
+        if (!contactExists.exists()) {
+            const userSnap = await db.ref(`users/${currentChat.id}`).once('value');
+            const userData = userSnap.val();
+            if (userData) {
+                await db.ref(`contacts/${currentUser.id}/${currentChat.id}`).set({
+                    name: userData.name || currentChat.name,
+                    login: userData.login,
+                    added_at: Date.now()
+                });
+                showToast(`✅ ${userData.name} добавлен в контакты`);
+                await loadContacts();
+            }
         }
         
         const msgId = Date.now().toString();
@@ -1774,60 +1413,32 @@
             to: currentChat.id,
             type: 'text',
             content: text,
-            timestamp: Date.now(),
-            delivered: false
+            timestamp: Date.now()
         };
         
-        try {
-            await Promise.all([
-                db.ref(`messages/${currentChat.id}/${currentUser.id}/${msgId}`).set(msgData),
-                db.ref(`messages/${currentUser.id}/${currentChat.id}/${msgId}`).set(msgData)
-            ]);
-            
-            const check = await db.ref(`messages/${currentUser.id}/${currentChat.id}/${msgId}`).once('value');
-            if (!check.exists()) throw new Error('Запись не удалась');
-            
-            document.getElementById('messageInput').value = '';
-            await loadMessages();
-            
-            const container = document.getElementById('messages');
-            if (container) container.scrollTop = container.scrollHeight;
-            
-        } catch(e) {
-            console.error('❌ Ошибка отправки:', e);
-            showToast('Ошибка отправки сообщения');
-        }
+        await Promise.all([
+            db.ref(`messages/${currentChat.id}/${currentUser.id}/${msgId}`).set(msgData),
+            db.ref(`messages/${currentUser.id}/${currentChat.id}/${msgId}`).set(msgData)
+        ]);
+        
+        document.getElementById('messageInput').value = '';
+        await loadMessages();
+        await loadChats();
     }
     
     function selectFile() { document.getElementById('fileInput').click(); }
     
-    function detectFileType(filename, mimeType) {
-        if (mimeType && mimeType.startsWith('image/')) return 'photo';
-        if (mimeType && mimeType.startsWith('video/')) return 'video';
-        return 'file';
-    }
-    
     document.getElementById('fileInput').onchange = async (e) => {
         const file = e.target.files[0];
-        if (!file || !currentChat || isBlocked(currentChat.id)) {
-            if (isBlocked(currentChat?.id)) showToast('Нельзя отправить файл заблокированному пользователю');
-            return;
-        }
+        if (!file || !currentChat || isBlocked(currentChat.id)) return;
         
-        const userSnap = await db.ref(`users/${currentChat.id}`).once('value');
-        const userData = userSnap.val();
-        if (userData) {
-            await ensureContactAndChat(currentChat.id, userData.name, userData.login);
-        }
-        
-        const fileType = detectFileType(file.name, file.type);
         const reader = new FileReader();
         reader.onload = async (ev) => {
             const msgId = Date.now().toString();
             const msgData = {
                 from: currentUser.id,
                 to: currentChat.id,
-                type: fileType,
+                type: 'file',
                 name: file.name,
                 content: ev.target.result,
                 timestamp: Date.now()
@@ -1837,8 +1448,6 @@
                 db.ref(`messages/${currentUser.id}/${currentChat.id}/${msgId}`).set(msgData)
             ]);
             await loadMessages();
-            const container = document.getElementById('messages');
-            if (container) container.scrollTop = container.scrollHeight;
         };
         reader.readAsDataURL(file);
         document.getElementById('fileInput').value = '';
@@ -1859,13 +1468,6 @@
                     const reader = new FileReader();
                     reader.onload = async () => {
                         if (!currentChat || isBlocked(currentChat.id)) return;
-                        
-                        const userSnap = await db.ref(`users/${currentChat.id}`).once('value');
-                        const userData = userSnap.val();
-                        if (userData) {
-                            await ensureContactAndChat(currentChat.id, userData.name, userData.login);
-                        }
-                        
                         const msgId = Date.now().toString();
                         const msgData = { from: currentUser.id, to: currentChat.id, type: 'audio', content: reader.result, timestamp: Date.now() };
                         await Promise.all([
@@ -1873,8 +1475,6 @@
                             db.ref(`messages/${currentUser.id}/${currentChat.id}/${msgId}`).set(msgData)
                         ]);
                         await loadMessages();
-                        const container = document.getElementById('messages');
-                        if (container) container.scrollTop = container.scrollHeight;
                     };
                     reader.readAsDataURL(blob);
                     stream.getTracks().forEach(t => t.stop());
@@ -1886,226 +1486,17 @@
         }
     }
     
-    // ========== ЗВОНКИ ==========
-    function setupCallListener() {
-        if (!currentUser) return;
-        
-        db.ref(`calls/${currentUser.id}/offer`).on('value', async (snap) => {
-            if (snap.exists() && !callActive) {
-                const offerData = snap.val();
-                const fromUserId = offerData.from;
-                const fromUserSnap = await db.ref(`users/${fromUserId}`).once('value');
-                const fromUserData = fromUserSnap.val();
-                const fromName = fromUserData?.name || fromUserId;
-                
-                if (confirm(`📞 Входящий звонок от ${fromName}. Ответить?`)) {
-                    await acceptCall(fromUserId, offerData.offer);
-                    await snap.ref.remove();
-                } else {
-                    await snap.ref.remove();
-                }
-            }
-        });
-    }
-    
-    async function startCall() {
-        if (!currentChat) {
-            showToast('Откройте чат с контактом');
-            return;
-        }
-        
-        if (callActive) {
-            showToast('Звонок уже активен');
-            return;
-        }
-        
-        const callBtn = document.getElementById('callBtn');
-        const endCallBtn = document.getElementById('endCallBtn');
-        
-        showToast(`📞 Звонок ${currentChat.name}...`);
-        
-        try {
-            localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            
-            peerConnection = new RTCPeerConnection({
-                iceServers: [
-                    { urls: 'stun:stun.l.google.com:19302' },
-                    { urls: 'stun:stun1.l.google.com:19302' }
-                ]
-            });
-            
-            localStream.getTracks().forEach(track => {
-                peerConnection.addTrack(track, localStream);
-            });
-            
-            peerConnection.ontrack = (event) => {
-                console.log('📡 Получен поток от собеседника');
-                const audio = new Audio();
-                audio.srcObject = event.streams[0];
-                audio.play().catch(e => console.log('Автовоспроизведение:', e));
-                showToast('🔊 Соединение установлено');
-                callActive = true;
-                if (callBtn) callBtn.style.display = 'none';
-                if (endCallBtn) endCallBtn.style.display = 'flex';
-            };
-            
-            peerConnection.onicecandidate = (event) => {
-                if (event.candidate) {
-                    db.ref(`calls/${currentChat.id}/candidates`).push({
-                        candidate: {
-                            candidate: event.candidate.candidate,
-                            sdpMid: event.candidate.sdpMid,
-                            sdpMLineIndex: event.candidate.sdpMLineIndex
-                        },
-                        from: currentUser.id,
-                        timestamp: Date.now()
-                    });
-                }
-            };
-            
-            peerConnection.onconnectionstatechange = () => {
-                console.log('🔗 Состояние:', peerConnection.connectionState);
-                if (peerConnection.connectionState === 'connected') {
-                    showToast('✅ Звонок установлен');
-                } else if (peerConnection.connectionState === 'disconnected' || peerConnection.connectionState === 'failed') {
-                    endCall();
-                }
-            };
-            
-            const offer = await peerConnection.createOffer();
-            await peerConnection.setLocalDescription(offer);
-            
-            await db.ref(`calls/${currentChat.id}/offer`).set({
-                offer: { type: offer.type, sdp: offer.sdp },
-                from: currentUser.id,
-                timestamp: Date.now()
-            });
-            
-            if (callBtn) callBtn.style.display = 'none';
-            if (endCallBtn) endCallBtn.style.display = 'flex';
-            
-            const answerRef = db.ref(`calls/${currentUser.id}/answer`);
-            const answerSnap = await answerRef.once('value');
-            if (answerSnap.exists()) {
-                const answerData = answerSnap.val();
-                const answer = new RTCSessionDescription({
-                    type: answerData.answer.type,
-                    sdp: answerData.answer.sdp
-                });
-                await peerConnection.setRemoteDescription(answer);
-                await answerRef.remove();
-                callActive = true;
-            }
-            
-            db.ref(`calls/${currentUser.id}/candidates`).on('child_added', async (snap) => {
-                if (peerConnection && snap.val().from !== currentUser.id) {
-                    const candidateData = snap.val().candidate;
-                    const candidate = new RTCIceCandidate({
-                        candidate: candidateData.candidate,
-                        sdpMid: candidateData.sdpMid,
-                        sdpMLineIndex: candidateData.sdpMLineIndex
-                    });
-                    await peerConnection.addIceCandidate(candidate);
-                }
-            });
-            
-        } catch(e) {
-            console.error('❌ Ошибка звонка:', e);
-            showToast('❌ Не удалось начать звонок');
-            endCall();
-        }
-    }
-    
-    async function acceptCall(fromUserId, offer) {
-        const callBtn = document.getElementById('callBtn');
-        const endCallBtn = document.getElementById('endCallBtn');
-        
-        try {
-            localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            
-            peerConnection = new RTCPeerConnection({
-                iceServers: [
-                    { urls: 'stun:stun.l.google.com:19302' },
-                    { urls: 'stun:stun1.l.google.com:19302' }
-                ]
-            });
-            
-            localStream.getTracks().forEach(track => {
-                peerConnection.addTrack(track, localStream);
-            });
-            
-            peerConnection.ontrack = (event) => {
-                const audio = new Audio();
-                audio.srcObject = event.streams[0];
-                audio.play();
-                callActive = true;
-                if (callBtn) callBtn.style.display = 'none';
-                if (endCallBtn) endCallBtn.style.display = 'flex';
-                showToast('🔊 Звонок начался');
-            };
-            
-            peerConnection.onicecandidate = (event) => {
-                if (event.candidate) {
-                    db.ref(`calls/${fromUserId}/candidates`).push({
-                        candidate: {
-                            candidate: event.candidate.candidate,
-                            sdpMid: event.candidate.sdpMid,
-                            sdpMLineIndex: event.candidate.sdpMLineIndex
-                        },
-                        from: currentUser.id,
-                        timestamp: Date.now()
-                    });
-                }
-            };
-            
-            peerConnection.onconnectionstatechange = () => {
-                if (peerConnection.connectionState === 'disconnected' || peerConnection.connectionState === 'failed') {
-                    endCall();
-                }
-            };
-            
-            await peerConnection.setRemoteDescription(new RTCSessionDescription({
-                type: offer.type,
-                sdp: offer.sdp
-            }));
-            
-            const answer = await peerConnection.createAnswer();
-            await peerConnection.setLocalDescription(answer);
-            
-            await db.ref(`calls/${fromUserId}/answer`).set({
-                answer: { type: answer.type, sdp: answer.sdp },
-                from: currentUser.id,
-                timestamp: Date.now()
-            });
-            
-            callActive = true;
-            if (callBtn) callBtn.style.display = 'none';
-            if (endCallBtn) endCallBtn.style.display = 'flex';
-            
-        } catch(e) {
-            console.error('❌ Ошибка принятия звонка:', e);
-            endCall();
-        }
+    // ========== ЗВОНКИ (упрощенно) ==========
+    function startCall() {
+        showToast('📞 Звонок (функция в разработке)');
     }
     
     function endCall() {
-        const callBtn = document.getElementById('callBtn');
-        const endCallBtn = document.getElementById('endCallBtn');
-        
-        if (peerConnection) {
-            peerConnection.close();
-            peerConnection = null;
-        }
-        if (localStream) {
-            localStream.getTracks().forEach(track => track.stop());
-            localStream = null;
-        }
+        if (peerConnection) peerConnection.close();
+        if (localStream) localStream.getTracks().forEach(t => t.stop());
         callActive = false;
-        
-        if (callBtn) callBtn.style.display = 'flex';
-        if (endCallBtn) endCallBtn.style.display = 'none';
-        
-        showToast('📞 Звонок завершен');
+        document.getElementById('endCallBtn').style.display = 'none';
+        document.getElementById('callBtn').style.display = 'flex';
     }
     
     // ========== UI ==========
