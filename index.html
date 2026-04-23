@@ -1516,19 +1516,18 @@
     let raciaCallWith = null;
     let raciaMessagesListener = null;
     
-    // Активация звука (один раз на сессию)
+    // Активация звука через Web Audio API (работает на телефонах)
     async function enableRaciaSound() {
         if (raciaSoundEnabled) return true;
         try {
-            const silent = new Audio();
-            silent.volume = 0.01;
-            silent.src = "data:audio/wav;base64,U3RlYWx0aCBibG9i";
-            await silent.play();
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            await audioCtx.resume();
+            audioCtx.close();
             raciaSoundEnabled = true;
             console.log('✅ Звук активирован');
             return true;
         } catch(e) {
-            console.log('⚠️ Звук не активирован:', e);
+            console.log('⚠️ Ошибка активации:', e);
             return false;
         }
     }
@@ -1556,7 +1555,6 @@
         document.getElementById('callBtn').style.display = 'none';
         document.getElementById('endCallBtn').style.display = 'flex';
         
-        // Создаем запрос звонка
         await db.ref(`calls/${callId}`).set({
             from: currentUser.id,
             fromLogin: currentUser.login,
@@ -1566,7 +1564,6 @@
             timestamp: Date.now()
         });
         
-        // Ожидаем ответ
         const ref = db.ref(`calls/${callId}`);
         const checkInterval = setInterval(async () => {
             const snap = await ref.once('value');
@@ -1585,7 +1582,7 @@
         
         setTimeout(() => {
             clearInterval(checkInterval);
-            if (raciaCallActive === false) {
+            if (!raciaCallActive) {
                 showToast('⏰ Нет ответа');
                 ref.remove();
                 endCall();
@@ -1593,79 +1590,43 @@
         }, 30000);
     }
     
-    // Прием входящего звонка
     function setupCallListener() {
         if (!currentUser) return;
         
-        db.ref('calls').orderByChild('to').equalTo(currentUser.id).on('child_added', (snap) => {
+        db.ref('calls').orderByChild('to').equalTo(currentUser.id).on('child_added', async (snap) => {
             const call = snap.val();
             if (call && call.status === 'ringing' && !raciaCallActive) {
-                showIncomingCall(snap.key, call.from, call.fromLogin);
+                const callId = snap.key;
+                const fromId = call.from;
+                const fromLogin = call.fromLogin;
+                
+                showToast(`📞 Входящий звонок от ${fromLogin}`);
+                
+                let contact = contacts.find(c => c.id === fromId);
+                if (!contact) {
+                    const userSnap = await db.ref(`users/${fromId}`).once('value');
+                    const userData = userSnap.val();
+                    if (userData) {
+                        contact = { id: fromId, login: userData.login, name: userData.name, avatar: userData.avatar || '👤' };
+                    }
+                }
+                
+                if (contact) {
+                    if (confirm(`📞 Входящий звонок от ${contact.name}\nОтветить?`)) {
+                        await db.ref(`calls/${callId}/status`).set('accepted');
+                        currentChat = contact;
+                        document.getElementById('chatName').innerText = contact.name;
+                        document.getElementById('chatLogin').innerText = '@' + contact.login;
+                        document.getElementById('chatContainer').classList.add('active');
+                        await startRaciaTalk(fromId, fromLogin);
+                    } else {
+                        await db.ref(`calls/${callId}/status`).set('rejected');
+                    }
+                }
             }
         });
     }
     
-    function showIncomingCall(callId, fromId, fromLogin) {
-        // Показываем уведомление в чате
-        if (currentChat && currentChat.id === fromId) {
-            const container = document.getElementById('messages');
-            const notif = document.createElement('div');
-            notif.className = 'message in';
-            notif.style.textAlign = 'center';
-            notif.style.background = '#ff9800';
-            notif.style.cursor = 'pointer';
-            notif.innerHTML = `
-                <div><strong>📞 Входящий звонок от ${fromLogin}</strong></div>
-                <div style="display:flex; gap:8px; margin-top:8px;">
-                    <button onclick="acceptIncomingCall('${callId}', '${fromId}', '${fromLogin}')" style="background:#4caf50; border:none; padding:8px 16px; border-radius:20px; color:white;">✅ Ответить</button>
-                    <button onclick="rejectIncomingCall('${callId}')" style="background:#dc3545; border:none; padding:8px 16px; border-radius:20px; color:white;">❌ Отклонить</button>
-                </div>
-            `;
-            container.appendChild(notif);
-            container.scrollTop = container.scrollHeight;
-            showToast(`📞 Входящий звонок от ${fromLogin}`);
-        } else {
-            showToast(`📞 Входящий звонок от ${fromLogin}. Откройте чат чтобы ответить.`);
-        }
-    }
-    
-    window.acceptIncomingCall = async function(callId, fromId, fromLogin) {
-        await db.ref(`calls/${callId}/status`).set('accepted');
-        showToast(`✅ Принимаем звонок от ${fromLogin}`);
-        
-        let contact = contacts.find(c => c.id === fromId);
-        if (!contact) {
-            const userSnap = await db.ref(`users/${fromId}`).once('value');
-            const userData = userSnap.val();
-            if (userData) {
-                contact = { id: fromId, login: userData.login, name: userData.name, avatar: userData.avatar || '👤' };
-                await db.ref(`contacts/${currentUser.id}/${fromId}`).set({ name: userData.name, login: userData.login, added_at: Date.now() });
-                await loadContacts();
-            }
-        }
-        
-        if (contact) {
-            currentChat = contact;
-            document.getElementById('chatName').innerText = contact.name;
-            document.getElementById('chatLogin').innerText = '@' + contact.login;
-            document.getElementById('chatContainer').classList.add('active');
-            await startRaciaTalk(fromId, fromLogin);
-        }
-        
-        document.querySelectorAll('.message.in').forEach(el => {
-            if (el.innerHTML.includes('Входящий звонок')) el.remove();
-        });
-    };
-    
-    window.rejectIncomingCall = async function(callId) {
-        await db.ref(`calls/${callId}/status`).set('rejected');
-        showToast(`❌ Звонок отклонен`);
-        document.querySelectorAll('.message.in').forEach(el => {
-            if (el.innerHTML.includes('Входящий звонок')) el.remove();
-        });
-    };
-    
-    // Начало разговора
     async function startRaciaTalk(targetId, targetLogin) {
         if (raciaCallActive) return;
         raciaCallActive = true;
@@ -1679,7 +1640,7 @@
         
         try {
             raciaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            showToast('🎤 Микрофон готов, говорите');
+            showToast('🎤 Микрофон готов, удерживайте кнопку');
         } catch(e) {
             showToast('❌ Нет доступа к микрофону');
             endCall();
@@ -1766,7 +1727,7 @@
             if (raciaAudioChunks.length === 0) return;
             
             const blob = new Blob(raciaAudioChunks, { type: 'audio/webm' });
-            if (blob.size > 500 && raciaCallActive && raciaCallWith) {
+            if (blob.size > 200 && raciaCallActive && raciaCallWith) {
                 const reader = new FileReader();
                 reader.onload = async (ev) => {
                     await db.ref(`call_messages/${raciaCallWith.id}`).push({
@@ -1797,7 +1758,7 @@
             if (raciaRecorder && raciaRecorder.state === 'recording') {
                 stopRaciaRecording();
             }
-        }, 30000);
+        }, 15000);
     }
     
     function stopRaciaRecording() {
