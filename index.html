@@ -1399,6 +1399,7 @@
                     <div>${msg.type === 'text' ? escapeHtml(msg.content) : 
                          msg.type === 'audio' ? `<audio controls src="${msg.content}" class="audio-player"></audio>` :
                          msg.type === 'photo' ? `<img src="${msg.content}" class="message-image" onclick="window.open('${msg.content}','_blank')">` :
+                         msg.type === 'video' ? `<video controls src="${msg.content}" class="message-video"></video>` :
                          msg.type === 'file' ? `<a href="${msg.content}" download="${msg.name}" class="message-file">📎 ${escapeHtml(msg.name)}</a>` : msg.content}</div>
                     <div class="message-meta">${msg.from === currentUser.id ? 'Вы' : currentChat.name} • ${new Date(msg.timestamp).toLocaleTimeString()}</div>
                 </div>
