@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>AudioDisk - ЗВОНОК (рация)</title>
+    <title>AudioDisk - ЗВОНОК (работает)</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -34,7 +34,6 @@
         button.danger { background: #dc3545; }
         button.success { background: #28a745; }
         button.call-btn { background: #4caf50; font-size: 18px; padding: 16px 32px; }
-        button.call-active { background: #dc3545; animation: pulse 1s infinite; }
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
         input {
             width: 100%;
@@ -67,7 +66,6 @@
         .status.talking { background: #4caf50; }
         .mic-level { height: 4px; background: #4caf50; width: 0%; transition: width 0.1s; margin-top: 8px; border-radius: 2px; }
         .peer { border-left: 3px solid #667eea; padding-left: 16px; margin: 12px 0; cursor: pointer; padding: 8px; }
-        .peer:hover { background: rgba(255,255,255,0.05); }
         .incoming-call {
             background: #ff9800;
             padding: 15px;
@@ -76,13 +74,11 @@
             text-align: center;
             animation: pulse 1s infinite;
         }
-        .incoming-call button { margin: 8px; }
     </style>
 </head>
 <body>
 <div class="container">
-    <h1>📞 ЗВОНОК (рация)</h1>
-    <p style="opacity:0.7;">Нажми "Позвонить" → собеседник принимает → говорите</p>
+    <h1>📞 ЗВОНОК</h1>
     
     <div class="card" id="authPanel">
         <input type="text" id="loginInput" placeholder="Логин">
@@ -93,7 +89,7 @@
     
     <div id="mainPanel" style="display:none;">
         <div class="card">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; justify-content: space-between;">
                 <h3>👤 <span id="myLogin">-</span></h3>
                 <div id="callStatus" class="status idle">⚪ Не в звонке</div>
             </div>
@@ -113,7 +109,7 @@
         </div>
         
         <div class="card">
-            <h3>📋 ЛОГ ЗВОНКА</h3>
+            <h3>📋 ЛОГ</h3>
             <button onclick="clearLog()">Очистить</button>
             <div id="log" class="log"></div>
         </div>
@@ -139,7 +135,6 @@
     let currentCall = null;
     let callActive = false;
     let mediaStream = null;
-    let recordingTimer = null;
     let audioContext = null;
     let analyserNode = null;
     let animationFrame = null;
@@ -200,6 +195,18 @@
         
         await loadUsers();
         setupCallListener();
+        
+        // Запасная активация по клику
+        document.body.addEventListener('click', async () => {
+            if (!soundReady) {
+                const tempCtx = new (window.AudioContext || window.webkitAudioContext)();
+                await tempCtx.resume();
+                tempCtx.close();
+                soundReady = true;
+                addLog('✅ Звук активирован кликом', 'success');
+            }
+        });
+        
         addLog(`🎙️ Готов к звонкам. Нажми "Позвонить"`, 'success');
     }
     
@@ -212,14 +219,12 @@
                 html += `<div class="peer" onclick="document.getElementById('targetLogin').value='${user.login}'">
                     <strong>${user.login}</strong> 
                     <span style="color:${user.online ? '#4caf50' : '#888'}">${user.online ? '● онлайн' : '○ офлайн'}</span>
-                    <span style="float:right;">📞</span>
                 </div>`;
             }
         });
         document.getElementById('usersList').innerHTML = html || '<div>Нет других пользователей</div>';
     }
     
-    // ========== ЗВОНОК ==========
     async function makeCall() {
         if (callActive) return addLog('Уже в звонке', 'warn');
         
@@ -249,7 +254,6 @@
             timestamp: Date.now()
         });
         
-        // Ждем ответ
         const ref = db.ref(`calls/${sessionId}`);
         const checkInterval = setInterval(async () => {
             const snap = await ref.once('value');
@@ -323,24 +327,33 @@
         document.getElementById('callBtn').style.display = 'none';
         document.getElementById('endCallBtn').style.display = 'inline-block';
         
-        // Активируем звук (короткий писк для разрешения)
+        // ПРИНУДИТЕЛЬНАЯ АКТИВАЦИЯ ЗВУКА
+        addLog(`🔊 Активируем звук...`, 'call');
         try {
-            const beep = new Audio();
-            beep.src = "data:audio/wav;base64,U3RlYWx0aCBibG9i";
-            beep.volume = 0.01;
-            await beep.play();
+            const silentAudio = new Audio();
+            silentAudio.src = "data:audio/wav;base64,U3RlYWx0aCBibG9i";
+            silentAudio.volume = 0.01;
+            await silentAudio.play();
+            
+            const tempCtx = new (window.AudioContext || window.webkitAudioContext)();
+            await tempCtx.resume();
+            tempCtx.close();
+            
             soundReady = true;
-            addLog('🔊 Звук активирован', 'success');
+            addLog(`✅ Звук активирован!`, 'success');
+            await new Promise(r => setTimeout(r, 100));
         } catch(e) {
-            addLog(`⚠️ Нажми на экран для звука`, 'warn');
+            addLog(`⚠️ Ошибка: ${e.message}`, 'warn');
+            soundReady = false;
         }
         
-        // Запрашиваем микрофон
+        // Микрофон
+        addLog(`🎤 Запрашиваем микрофон...`);
         mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        addLog(`🎤 Микрофон готов`, 'success');
+        addLog(`✅ Микрофон готов`, 'success');
         
-        // Уровень микрофона
         audioContext = new AudioContext();
+        await audioContext.resume();
         const source = audioContext.createMediaStreamSource(mediaStream);
         analyserNode = audioContext.createAnalyser();
         analyserNode.fftSize = 256;
@@ -360,7 +373,7 @@
         }
         updateMicLevel();
         
-        // Слушаем сообщения от собеседника
+        // Слушаем входящие сообщения
         db.ref(`call_messages/${currentUser.id}`).on('child_added', (snap) => {
             const msg = snap.val();
             if (msg && msg.from !== currentUser.id && callActive) {
@@ -373,7 +386,6 @@
             }
         });
         
-        // Запускаем запись и отправку (0.5 сек)
         startRecording(targetId);
     }
     
@@ -413,21 +425,19 @@
         recorder.start();
         setTimeout(() => {
             if (recorder.state === 'recording') recorder.stop();
-        }, 450); // 0.5 секунды
+        }, 450);
     }
     
     async function endCall() {
         addLog(`🔴 Завершение звонка...`);
         callActive = false;
         
-        if (recordingTimer) clearTimeout(recordingTimer);
         if (animationFrame) cancelAnimationFrame(animationFrame);
         if (audioContext) await audioContext.close();
         if (mediaStream) mediaStream.getTracks().forEach(t => t.stop());
         
         mediaStream = null;
         audioContext = null;
-        analyserNode = null;
         
         document.getElementById('callStatus').className = 'status idle';
         document.getElementById('callStatus').innerHTML = '⚪ Не в звонке';
@@ -446,8 +456,7 @@
         afterLogin();
     }
     
-    addLog(`🚀 ЗВОНОК-РАЦИЯ ЗАПУЩЕНА`, 'success');
-    addLog(`📌 Просто нажми "Позвонить" → собеседник принимает → говорите`, 'call');
+    addLog(`🚀 ЗВОНОК ЗАПУЩЕН`, 'success');
 </script>
 </body>
 </html>
