@@ -1451,17 +1451,26 @@
         const file = e.target.files[0];
         if (!file || !currentChat || isBlocked(currentChat.id)) return;
         
+        // Определяем тип файла
+        let fileType = 'file';
+        if (file.type.startsWith('image/')) {
+            fileType = 'photo';
+        } else if (file.type.startsWith('video/')) {
+            fileType = 'video';
+        }
+        
         const reader = new FileReader();
         reader.onload = async (ev) => {
             const msgId = Date.now().toString();
             const msgData = {
                 from: currentUser.id,
                 to: currentChat.id,
-                type: 'file',
+                type: fileType,
                 name: file.name,
                 content: ev.target.result,
                 timestamp: Date.now()
             };
+            
             await Promise.all([
                 db.ref(`messages/${currentChat.id}/${currentUser.id}/${msgId}`).set(msgData),
                 db.ref(`messages/${currentUser.id}/${currentChat.id}/${msgId}`).set(msgData)
