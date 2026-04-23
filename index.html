@@ -820,6 +820,14 @@
         loadData();
         setupMessageListener();
         showToast('Регистрация успешна!');
+        
+        // Активация звука по касанию
+        document.body.addEventListener('touchstart', () => {
+            if (!window.raciaSoundEnabled) enableRaciaSound();
+        }, { once: true });
+        document.body.addEventListener('mousedown', () => {
+            if (!window.raciaSoundEnabled) enableRaciaSound();
+        }, { once: true });
     }
     
     async function login() {
@@ -842,6 +850,14 @@
         loadData();
         setupMessageListener();
         showToast('Добро пожаловать!');
+        
+        // Активация звука по касанию
+        document.body.addEventListener('touchstart', () => {
+            if (!window.raciaSoundEnabled) enableRaciaSound();
+        }, { once: true });
+        document.body.addEventListener('mousedown', () => {
+            if (!window.raciaSoundEnabled) enableRaciaSound();
+        }, { once: true });
     }
     
     function checkAuth() {
