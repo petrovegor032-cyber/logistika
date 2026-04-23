@@ -1132,49 +1132,90 @@
         openChat(contact);
     }
     
-    // ========== КОНТАКТЫ ==========
+    // ========== КОНТАКТЫ - ИСПРАВЛЕННАЯ ВЕРСИЯ ДЛЯ ТЕЛЕФОНА ==========
     async function addContact() {
+        console.log('🟢 addContact() ВЫЗВАНА');
+        
         const login = document.getElementById('contactLoginInput').value.trim();
+        console.log('1️⃣ Логин:', login);
+        
         if (!login) {
             showToast('Введите логин');
             return;
         }
         
-        const snapshot = await db.ref('users').orderByChild('login').equalTo(login).once('value');
-        if (!snapshot.exists()) {
-            showToast('❌ Пользователь не найден');
-            return;
+        // Используем REST API вместо WebSocket (фикс для телефона)
+        const url = `https://audiozvonok-b340d-default-rtdb.firebaseio.com/users.json?orderBy="login"&equalTo="${login}"`;
+        console.log('2️⃣ URL:', url);
+        
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000);
+            
+            const response = await fetch(url, { signal: controller.signal });
+            clearTimeout(timeoutId);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            
+            const data = await response.json();
+            console.log('3️⃣ Данные:', data);
+            
+            if (!data || Object.keys(data).length === 0) {
+                showToast('❌ Пользователь не найден');
+                return;
+            }
+            
+            let contactId = Object.keys(data)[0];
+            let contactData = data[contactId];
+            
+            if (contactId === currentUser.id) {
+                showToast('❌ Нельзя добавить себя');
+                return;
+            }
+            
+            // Проверяем существующий контакт
+            const checkUrl = `https://audiozvonok-b340d-default-rtdb.firebaseio.com/contacts/${currentUser.id}/${contactId}.json`;
+            const checkResponse = await fetch(checkUrl);
+            const existing = await checkResponse.json();
+            
+            if (existing) {
+                showToast('⚠️ Контакт уже существует');
+                closeModal('addContactModal');
+                return;
+            }
+            
+            // Добавляем контакт
+            const addUrl = `https://audiozvonok-b340d-default-rtdb.firebaseio.com/contacts/${currentUser.id}/${contactId}.json`;
+            const addResponse = await fetch(addUrl, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: contactData.name || login,
+                    login: login,
+                    added_at: Date.now()
+                })
+            });
+            
+            if (addResponse.ok) {
+                showToast(`✅ ${contactData.name || login} добавлен`);
+                closeModal('addContactModal');
+                document.getElementById('contactLoginInput').value = '';
+                await loadContacts();
+                await loadChats();
+            } else {
+                showToast('❌ Ошибка при добавлении');
+            }
+            
+        } catch(e) {
+            if (e.name === 'AbortError') {
+                showToast('❌ Таймаут соединения');
+            } else {
+                console.error('Ошибка:', e);
+                showToast('Ошибка: ' + e.message);
+            }
         }
-        
-        let contactId, contactData;
-        snapshot.forEach(child => {
-            contactId = child.key;
-            contactData = child.val();
-        });
-        
-        if (contactId === currentUser.id) {
-            showToast('❌ Нельзя добавить себя');
-            return;
-        }
-        
-        const existing = await db.ref(`contacts/${currentUser.id}/${contactId}`).once('value');
-        if (existing.exists()) {
-            showToast('⚠️ Контакт уже существует');
-            closeModal('addContactModal');
-            return;
-        }
-        
-        await db.ref(`contacts/${currentUser.id}/${contactId}`).set({
-            name: contactData.name || login,
-            login: login,
-            added_at: Date.now()
-        });
-        
-        showToast(`✅ ${contactData.name || login} добавлен`);
-        closeModal('addContactModal');
-        document.getElementById('contactLoginInput').value = '';
-        await loadContacts();
-        await loadChats();
     }
     
     async function loadContacts() {
