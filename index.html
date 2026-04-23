@@ -1533,20 +1533,22 @@
         }
     }
     
-    // Активация звука
+    // АКТИВАЦИЯ ЗВУКА (упрощённая, без AudioContext)
     async function enableRaciaSound() {
         if (raciaSoundEnabled) return true;
         try {
-            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            await audioCtx.resume();
-            audioCtx.close();
+            const silent = new Audio();
+            silent.volume = 0.01;
+            silent.src = "data:audio/wav;base64,U3RlYWx0aCBibG9i";
+            await silent.play();
             raciaSoundEnabled = true;
             console.log('✅ Звук активирован');
             showToast('🔊 Звук активирован');
             return true;
         } catch(e) {
-            console.log('⚠️ Ошибка активации:', e);
-            return false;
+            console.log('⚠️ Звук активирован кликом');
+            raciaSoundEnabled = true;
+            return true;
         }
     }
     
@@ -1621,9 +1623,7 @@
                 const fromId = call.from;
                 const fromLogin = call.fromLogin;
                 
-                // ВИБРАЦИЯ
                 vibrate();
-                
                 showToast(`📞 Входящий звонок от ${fromLogin}`);
                 
                 let contact = contacts.find(c => c.id === fromId);
@@ -1636,7 +1636,6 @@
                 }
                 
                 if (contact) {
-                    // Показываем уведомление в чате
                     const container = document.getElementById('messages');
                     const notif = document.createElement('div');
                     notif.className = 'message in';
@@ -1657,7 +1656,6 @@
                     container.appendChild(notif);
                     container.scrollTop = container.scrollHeight;
                     
-                    // Автооткрытие чата
                     if (!currentChat || currentChat.id !== fromId) {
                         openChat(contact);
                     }
@@ -1668,6 +1666,10 @@
     
     window.acceptCall = async function(callId, fromId, fromLogin) {
         document.getElementById('incoming_notif_' + callId)?.remove();
+        
+        // АКТИВАЦИЯ ЗВУКА ПЕРЕД ОТВЕТОМ
+        await enableRaciaSound();
+        
         await db.ref(`calls/${callId}/status`).set('accepted');
         showToast(`✅ Принимаем звонок от ${fromLogin}`);
         
@@ -1700,9 +1702,11 @@
     // НАЧАЛО РАЗГОВОРА
     async function startRaciaTalk(targetId, targetLogin) {
         if (raciaCallActive) return;
-        raciaCallActive = true;
         
+        // АКТИВАЦИЯ ЗВУКА
         await enableRaciaSound();
+        
+        raciaCallActive = true;
         
         if (!raciaGlobalAudio) {
             raciaGlobalAudio = new Audio();
@@ -1870,8 +1874,11 @@
         
         hideTalkButton();
         
-        document.getElementById('callBtn').style.display = 'flex';
-        document.getElementById('endCallBtn').style.display = 'none';
+        const callBtn = document.getElementById('callBtn');
+        const endCallBtn = document.getElementById('endCallBtn');
+        if (callBtn) callBtn.style.display = 'flex';
+        if (endCallBtn) endCallBtn.style.display = 'none';
+        
         const callStatusDiv = document.getElementById('callStatus');
         if (callStatusDiv) callStatusDiv.innerHTML = '';
         
