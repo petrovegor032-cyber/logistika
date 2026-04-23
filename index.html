@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>AudioDisk - ЗВОНОК (стабильный)</title>
+    <title>AudioDisk - РАЦИЯ (кнопка "Говорить")</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -50,7 +50,7 @@
             padding: 12px;
             font-family: monospace;
             font-size: 10px;
-            max-height: 200px;
+            max-height: 150px;
             overflow-y: auto;
         }
         .status {
@@ -62,8 +62,8 @@
         }
         .status.idle { background: #333; }
         .status.calling { background: #ff9800; animation: pulse 1s infinite; }
-        .status.talking { background: #4caf50; animation: pulse 1s infinite; }
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
+        .status.talking { background: #4caf50; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
         .mic-level { height: 4px; background: #4caf50; width: 0%; transition: width 0.1s; margin-top: 8px; border-radius: 2px; }
         .peer { border-left: 3px solid #667eea; padding-left: 16px; margin: 12px 0; cursor: pointer; padding: 8px; }
         .incoming-call {
@@ -74,20 +74,48 @@
             text-align: center;
             animation: pulse 1s infinite;
         }
-        .activate-sound {
-            background: #ff9800;
-            padding: 12px;
-            text-align: center;
-            border-radius: 40px;
-            margin-bottom: 12px;
-            cursor: pointer;
+        
+        /* ОБЪЕМНАЯ КНОПКА ГОВОРИТЬ */
+        .talk-btn {
+            width: 100%;
+            padding: 40px 20px;
+            font-size: 32px;
             font-weight: bold;
+            background: linear-gradient(145deg, #4caf50, #2e7d32);
+            border-radius: 80px;
+            box-shadow: 0 12px 25px rgba(0,0,0,0.3), inset 0 2px 5px rgba(255,255,255,0.3);
+            transition: all 0.05s linear;
+            cursor: pointer;
+            text-align: center;
+            user-select: none;
+            touch-action: manipulation;
+            margin: 16px 0;
+        }
+        .talk-btn:active {
+            transform: scale(0.97);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            background: linear-gradient(145deg, #2e7d32, #1b5e20);
+        }
+        .talk-btn.recording {
+            background: linear-gradient(145deg, #ff5722, #d32f2f);
+            box-shadow: 0 0 20px rgba(255,87,34,0.8);
+            animation: pulse-red 0.5s infinite;
+        }
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 rgba(255,87,34,0.7); }
+            70% { box-shadow: 0 0 0 15px rgba(255,87,34,0); }
+            100% { box-shadow: 0 0 0 0 rgba(255,87,34,0); }
+        }
+        .disable-talk {
+            opacity: 0.5;
+            pointer-events: none;
         }
     </style>
 </head>
 <body>
 <div class="container">
-    <h1>📞 ЗВОНОК</h1>
+    <h1>📻 РАЦИЯ</h1>
+    <p style="opacity:0.7;">Нажми и УДЕРЖИВАЙ кнопку чтобы говорить → отпусти → отправится</p>
     
     <div class="card" id="authPanel">
         <input type="text" id="loginInput" placeholder="Логин">
@@ -105,15 +133,22 @@
             <div class="mic-level" id="micLevel"></div>
         </div>
         
-        <div id="soundActivation" class="activate-sound" style="display:none;">
-            🔊 НАЖМИ СЮДА ОДИН РАЗ ДЛЯ ВКЛЮЧЕНИЯ ЗВУКА
-        </div>
-        
         <div class="card">
             <h3>📞 Кому позвонить?</h3>
             <input type="text" id="targetLogin" placeholder="Логин собеседника">
             <button id="callBtn" class="call-btn" onclick="makeCall()">📞 ПОЗВОНИТЬ</button>
-            <button id="endCallBtn" onclick="endCall()" class="danger call-btn" style="display:none;">🔴 ЗАВЕРШИТЬ</button>
+            <button id="endCallBtn" onclick="endCall()" class="danger" style="display:none;">🔴 ЗАВЕРШИТЬ</button>
+        </div>
+        
+        <!-- Объемная кнопка ГОВОРИТЬ -->
+        <div id="talkArea" style="display:none;">
+            <div class="talk-btn" id="talkBtn" 
+                 ontouchstart="startRecording()" ontouchend="stopRecording()"
+                 onmousedown="startRecording()" onmouseup="stopRecording()" 
+                 onmouseleave="stopRecording()">
+                🎙️ ГОВОРИТЬ
+            </div>
+            <p style="text-align:center; font-size:12px; margin-top:8px;">👇 Удерживай, говори, отпусти</p>
         </div>
         
         <div class="card">
@@ -148,12 +183,12 @@
     let currentCall = null;
     let callActive = false;
     let mediaStream = null;
-    let audioContext = null;
-    let analyserNode = null;
-    let animationFrame = null;
     let globalAudio = null;
     let soundEnabled = false;
     let sessionId = null;
+    let isRecording = false;
+    let recorder = null;
+    let audioChunks = [];
     
     function addLog(msg, type = 'info') {
         const logDiv = document.getElementById('log');
@@ -167,22 +202,6 @@
     function clearLog() {
         document.getElementById('log').innerHTML = '';
         addLog('Лог очищен');
-    }
-    
-    function enableSound() {
-        if (soundEnabled) return;
-        soundEnabled = true;
-        if (globalAudio) {
-            globalAudio.play().catch(() => {});
-            addLog('✅ Звук активирован!', 'success');
-            document.getElementById('soundActivation').style.display = 'none';
-        } else {
-            globalAudio = new Audio();
-            globalAudio.volume = 1.0;
-            soundEnabled = true;
-            document.getElementById('soundActivation').style.display = 'none';
-            addLog('✅ Звук готов', 'success');
-        }
     }
     
     async function register() {
@@ -223,13 +242,29 @@
         globalAudio = new Audio();
         globalAudio.volume = 1.0;
         
-        const activationDiv = document.getElementById('soundActivation');
-        activationDiv.style.display = 'block';
-        activationDiv.onclick = () => enableSound();
+        // Автоактивация звука при первом касании
+        document.body.addEventListener('touchstart', () => {
+            if (!soundEnabled) {
+                const silent = new Audio();
+                silent.volume = 0.01;
+                silent.play().catch(()=>{});
+                soundEnabled = true;
+                addLog('✅ Звук активирован', 'success');
+            }
+        });
+        document.body.addEventListener('mousedown', () => {
+            if (!soundEnabled) {
+                const silent = new Audio();
+                silent.volume = 0.01;
+                silent.play().catch(()=>{});
+                soundEnabled = true;
+                addLog('✅ Звук активирован', 'success');
+            }
+        });
         
         await loadUsers();
         setupCallListener();
-        addLog(`🎙️ Готов к звонкам. Нажми оранжевую кнопку для звука.`, 'success');
+        addLog(`🎙️ Готов. Нажми "Позвонить" и удерживай кнопку "ГОВОРИТЬ"`, 'success');
     }
     
     async function loadUsers() {
@@ -283,7 +318,7 @@
             if (data?.status === 'accepted') {
                 clearInterval(checkInterval);
                 addLog(`✅ ${targetLogin} принял звонок!`, 'success');
-                await startCallSession(targetId, targetLogin);
+                await startTalkSession(targetId, targetLogin);
                 await ref.remove();
             } else if (data?.status === 'rejected') {
                 clearInterval(checkInterval);
@@ -332,7 +367,7 @@
         addLog(`✅ Принимаем звонок от ${fromLogin}`, 'success');
         currentCall = { id: fromId, login: fromLogin };
         sessionId = sId;
-        await startCallSession(fromId, fromLogin);
+        await startTalkSession(fromId, fromLogin);
     }
     
     async function rejectCall(sId) {
@@ -341,51 +376,19 @@
         addLog(`❌ Звонок отклонен`, 'error');
     }
     
-    async function startCallSession(targetId, targetLogin) {
+    async function startTalkSession(targetId, targetLogin) {
         if (callActive) return;
         callActive = true;
         
         document.getElementById('callStatus').className = 'status talking';
-        document.getElementById('callStatus').innerHTML = '🎙️ РАЗГОВОР...';
+        document.getElementById('callStatus').innerHTML = '🎙️ РАЗГОВОР';
         document.getElementById('callBtn').style.display = 'none';
         document.getElementById('endCallBtn').style.display = 'inline-block';
+        document.getElementById('talkArea').style.display = 'block';
         
-        // Активация звука
-        try {
-            const beep = new Audio();
-            beep.volume = 0.05;
-            beep.src = "data:audio/wav;base64,U3RlYWx0aCBibG9i";
-            await beep.play();
-            soundEnabled = true;
-            addLog('🔊 Звук активирован', 'success');
-        } catch(e) {
-            addLog(`⚠️ Нажми оранжевую кнопку для звука`, 'warn');
-        }
-        
-        // Микрофон
+        // Запрашиваем микрофон один раз на сессию
         mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        addLog(`✅ Микрофон готов`, 'success');
-        
-        audioContext = new AudioContext();
-        await audioContext.resume();
-        const source = audioContext.createMediaStreamSource(mediaStream);
-        analyserNode = audioContext.createAnalyser();
-        analyserNode.fftSize = 256;
-        source.connect(analyserNode);
-        
-        function updateMicLevel() {
-            if (!callActive) return;
-            const dataArray = new Uint8Array(analyserNode.frequencyBinCount);
-            analyserNode.getByteTimeDomainData(dataArray);
-            let max = 0;
-            for (let i = 0; i < dataArray.length; i++) {
-                const v = (dataArray[i] - 128) / 128;
-                max = Math.max(max, Math.abs(v));
-            }
-            document.getElementById('micLevel').style.width = Math.min(100, max * 100) + '%';
-            animationFrame = requestAnimationFrame(updateMicLevel);
-        }
-        updateMicLevel();
+        addLog(`🎤 Микрофон готов`, 'success');
         
         // Слушаем входящие сообщения
         db.ref(`call_messages/${currentUser.id}`).on('child_added', (snap) => {
@@ -399,31 +402,35 @@
                 snap.ref.remove();
             }
         });
-        
-        startRecording(targetId);
     }
     
-    async function startRecording(targetId) {
-        if (!callActive || !mediaStream) return;
+    async function startRecording() {
+        if (!callActive) {
+            addLog('❌ Сначала прими звонок', 'warn');
+            return;
+        }
+        if (isRecording) return;
         
-        const chunks = [];
-        const recorder = new MediaRecorder(mediaStream);
+        isRecording = true;
+        audioChunks = [];
         
+        recorder = new MediaRecorder(mediaStream);
         recorder.ondataavailable = (e) => {
-            if (e.data.size > 0) chunks.push(e.data);
+            if (e.data.size > 0) audioChunks.push(e.data);
         };
         
         recorder.onstop = async () => {
-            if (chunks.length === 0) {
-                if (callActive) setTimeout(() => startRecording(targetId), 50);
+            if (audioChunks.length === 0) {
+                isRecording = false;
                 return;
             }
             
-            const blob = new Blob(chunks, { type: 'audio/webm' });
-            if (blob.size > 200 && callActive) {
+            const blob = new Blob(audioChunks, { type: 'audio/webm' });
+            if (blob.size > 500 && callActive && currentCall) {
+                addLog(`📤 Отправка (${Math.round(blob.size/1000)}KB)`, 'audio');
                 const reader = new FileReader();
                 reader.onload = async (ev) => {
-                    await db.ref(`call_messages/${targetId}`).push({
+                    await db.ref(`call_messages/${currentCall.id}`).push({
                         from: currentUser.id,
                         fromLogin: currentUser.login,
                         data: ev.target.result,
@@ -432,26 +439,40 @@
                 };
                 reader.readAsDataURL(blob);
             }
-            
-            if (callActive) setTimeout(() => startRecording(targetId), 50);
+            isRecording = false;
+            document.getElementById('talkBtn').classList.remove('recording');
         };
         
         recorder.start();
+        document.getElementById('talkBtn').classList.add('recording');
+        document.getElementById('talkBtn').innerHTML = '🔴 ГОВОРЮ...';
+        addLog(`🎙️ Запись...`, 'audio');
+        
+        // Автостоп через 15 секунд
         setTimeout(() => {
-            if (recorder.state === 'recording') recorder.stop();
-        }, 1000); // 1 секунда - оптимально
+            if (isRecording) stopRecording();
+        }, 15000);
+    }
+    
+    function stopRecording() {
+        if (recorder && recorder.state === 'recording') {
+            recorder.stop();
+            document.getElementById('talkBtn').classList.remove('recording');
+            document.getElementById('talkBtn').innerHTML = '🎙️ ГОВОРИТЬ';
+            addLog(`⏹️ Запись остановлена`, 'audio');
+        }
     }
     
     async function endCall() {
         addLog(`🔴 Завершение звонка...`);
         callActive = false;
         
-        if (animationFrame) cancelAnimationFrame(animationFrame);
-        if (audioContext) await audioContext.close();
-        if (mediaStream) mediaStream.getTracks().forEach(t => t.stop());
+        if (recorder && recorder.state === 'recording') recorder.stop();
         
-        mediaStream = null;
-        audioContext = null;
+        if (mediaStream) {
+            mediaStream.getTracks().forEach(t => t.stop());
+            mediaStream = null;
+        }
         
         if (sessionId) await db.ref(`calls/${sessionId}`).remove();
         
@@ -459,6 +480,7 @@
         document.getElementById('callStatus').innerHTML = '⚪ Не в звонке';
         document.getElementById('callBtn').style.display = 'inline-block';
         document.getElementById('endCallBtn').style.display = 'none';
+        document.getElementById('talkArea').style.display = 'none';
         document.getElementById('micLevel').style.width = '0%';
         
         currentCall = null;
@@ -473,8 +495,8 @@
         afterLogin();
     }
     
-    addLog(`🚀 ЗВОНОК ЗАПУЩЕН`, 'success');
-    addLog(`📌 Нажми на оранжевую кнопку для активации звука`, 'info');
+    addLog(`🚀 РАЦИЯ ЗАПУЩЕНА`, 'success');
+    addLog(`📌 Нажми "Позвонить" → собеседник ответит → удерживай кнопку "ГОВОРИТЬ"`, 'info');
 </script>
 </body>
 </html>
