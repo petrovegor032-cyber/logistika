@@ -1372,7 +1372,7 @@
             window.chatListenerRef.off();
             window.chatListenerRef = null;
         }
-        if (peerConnection) endCall();
+        if (raciaCallActive) endCall();  // ← исправлено: вместо peerConnection
         currentChat = null;
         document.getElementById('chatContainer').classList.remove('active');
     }
