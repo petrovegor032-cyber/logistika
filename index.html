@@ -1235,7 +1235,11 @@
                 const marker = L.marker([ad.lat, ad.lng], {
                     icon: L.divIcon({ html: `<div style="font-size:32px;">${ad.icon || '📌'}</div>`, iconSize: [35, 35] })
                 }).addTo(map);
-                marker.bindPopup(`<b>${escapeHtml(ad.text)}</b><br><button onclick="openChatFromAd('${ad.userId}')">💬 Написать</button>`);
+                marker.bindPopup(`
+                    <b>${escapeHtml(ad.text)}</b><br>
+                    ${ad.price ? `💰 ${ad.price}₽<br>` : ''}
+                    <button onclick="openChatFromAd('${ad.userId}')">💬 Написать</button>
+                `);
                 markers.push(marker);
             });
         }
@@ -1286,10 +1290,10 @@
         const contactExists = await db.ref(`contacts/${currentUser.id}/${userId}`).once('value');
         if (!contactExists.exists()) {
             await db.ref(`contacts/${currentUser.id}/${userId}`).set({ name: userData.name, login: userData.login, added_at: Date.now() });
-            await loadContacts();
+            await loadDialogs();
         }
         
-        switchPage('main');
+        switchPage('dialogs');
         openChat(contact);
     }
     
