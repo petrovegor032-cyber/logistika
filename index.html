@@ -1197,13 +1197,25 @@
         document.getElementById('adText').value = '';
         document.getElementById('adPrice').value = '';
         document.getElementById('adPhoto').value = '';
+        
         await loadAds();
+        
+        // Обновляем маркеры на карте
+        if (map) {
+            markers.forEach(m => map.removeLayer(m));
+            markers = [];
+            renderAds();
+        }
     }
     
     async function loadAds() {
         const snapshot = await db.ref('ads').once('value');
         allAds = [];
-        if (snapshot.exists()) snapshot.forEach(child => allAds.push({ id: child.key, ...child.val() }));
+        if (snapshot.exists()) {
+            snapshot.forEach(child => {
+                allAds.push({ id: child.key, ...child.val() });
+            });
+        }
         renderAds();
     }
     
@@ -1261,6 +1273,7 @@
     }
     
     async function showMyAds() {
+        await loadAds();
         const myAds = allAds.filter(ad => ad.userId === currentUser.id);
         document.getElementById('myAdsList').innerHTML = myAds.map(ad => `
             <div class="ad-card">
