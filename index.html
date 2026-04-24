@@ -836,13 +836,23 @@
         setupMessageListener();
         showToast('Регистрация успешна!');
         
-        // Активация звука
-        if (!window.raciaSoundEnabled) {
-            const silent = new Audio();
-            silent.volume = 0.01;
-            silent.play().catch(()=>{});
-            window.raciaSoundEnabled = true;
-        }
+        // Активация звука по касанию
+        document.body.addEventListener('touchstart', () => {
+            if (!window.raciaSoundEnabled) {
+                const silent = new Audio();
+                silent.volume = 0.01;
+                silent.play().catch(()=>{});
+                window.raciaSoundEnabled = true;
+            }
+        }, { once: true });
+        document.body.addEventListener('mousedown', () => {
+            if (!window.raciaSoundEnabled) {
+                const silent = new Audio();
+                silent.volume = 0.01;
+                silent.play().catch(()=>{});
+                window.raciaSoundEnabled = true;
+            }
+        }, { once: true });
     }
     
     async function login() {
@@ -866,13 +876,23 @@
         setupMessageListener();
         showToast('Добро пожаловать!');
         
-        // Активация звука
-        if (!window.raciaSoundEnabled) {
-            const silent = new Audio();
-            silent.volume = 0.01;
-            silent.play().catch(()=>{});
-            window.raciaSoundEnabled = true;
-        }
+        // Активация звука по касанию
+        document.body.addEventListener('touchstart', () => {
+            if (!window.raciaSoundEnabled) {
+                const silent = new Audio();
+                silent.volume = 0.01;
+                silent.play().catch(()=>{});
+                window.raciaSoundEnabled = true;
+            }
+        }, { once: true });
+        document.body.addEventListener('mousedown', () => {
+            if (!window.raciaSoundEnabled) {
+                const silent = new Audio();
+                silent.volume = 0.01;
+                silent.play().catch(()=>{});
+                window.raciaSoundEnabled = true;
+            }
+        }, { once: true });
     }
     
     function checkAuth() {
@@ -885,13 +905,23 @@
             setupMessageListener();
             requestNotificationPermission();
             
-            // Активация звука
-            if (!window.raciaSoundEnabled) {
-                const silent = new Audio();
-                silent.volume = 0.01;
-                silent.play().catch(()=>{});
-                window.raciaSoundEnabled = true;
-            }
+            // Активация звука по касанию
+            document.body.addEventListener('touchstart', () => {
+                if (!window.raciaSoundEnabled) {
+                    const silent = new Audio();
+                    silent.volume = 0.01;
+                    silent.play().catch(()=>{});
+                    window.raciaSoundEnabled = true;
+                }
+            }, { once: true });
+            document.body.addEventListener('mousedown', () => {
+                if (!window.raciaSoundEnabled) {
+                    const silent = new Audio();
+                    silent.volume = 0.01;
+                    silent.play().catch(()=>{});
+                    window.raciaSoundEnabled = true;
+                }
+            }, { once: true });
         } else {
             openModal('authModal');
         }
@@ -1706,11 +1736,13 @@
     window.acceptCall = async function(callId, fromId, fromLogin) {
         document.getElementById('incoming_notif_' + callId)?.remove();
         
-        // АКТИВАЦИЯ ЗВУКА ПЕРЕД ОТВЕТОМ
         await enableRaciaSound();
-        
         await db.ref(`calls/${callId}/status`).set('accepted');
         showToast(`✅ Принимаем звонок от ${fromLogin}`);
+        
+        // ДЛЯ ПРИНИМАЮЩЕЙ СТОРОНЫ - ПОКАЗЫВАЕМ КНОПКИ
+        document.getElementById('callBtn').style.display = 'none';
+        document.getElementById('endCallBtn').style.display = 'flex';
         
         let contact = contacts.find(c => c.id === fromId);
         if (!contact) {
@@ -1742,9 +1774,7 @@
     async function startRaciaTalk(targetId, targetLogin) {
         if (raciaCallActive) return;
         
-        // АКТИВАЦИЯ ЗВУКА
         await enableRaciaSound();
-        
         raciaCallActive = true;
         
         if (!raciaGlobalAudio) {
@@ -1776,6 +1806,7 @@
             }
         });
         
+        // ПОКАЗЫВАЕМ БОЛЬШУЮ КНОПКУ ДЛЯ ВСЕХ
         showTalkButton();
     }
     
@@ -1938,7 +1969,7 @@
         if (!currentUser) return;
         await loadBlockedUsers();
         await loadContacts();
-        loadChats();
+        await loadChats();
         await loadAds();
         setupCallListener();  // ← ДОБАВЛЕНО
         db.ref(`users/${currentUser.id}/online`).set(true);
