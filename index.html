@@ -1925,6 +1925,7 @@
         await loadContacts();
         await loadChats();
         await loadAds();
+        setupCallListener();  // ← ДОБАВИТЬ ЭТУ СТРОКУ
         db.ref(`users/${currentUser.id}/online`).set(true);
         setInterval(() => {
             if (currentUser) db.ref(`users/${currentUser.id}/online`).set(true);
