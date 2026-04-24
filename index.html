@@ -1584,7 +1584,7 @@
         }
     }
     
-    // ========== РАЦИЯ-ЗВОНОК (ПОЛНАЯ РАБОЧАЯ ВЕРСИЯ) ==========
+    // ========== РАЦИЯ-ЗВОНОК (ПОЛНАЯ КОПИЯ ИЗ ТЕСТОВОЙ РАЦИИ) ==========
     let raciaCallActive = false;
     let raciaStream = null;
     let raciaRecorder = null;
@@ -1595,29 +1595,9 @@
     let raciaCallWith = null;
     let raciaMessagesListener = null;
     
-    // ВИБРАЦИЯ
     function vibrate() {
         if ('vibrate' in navigator) {
             navigator.vibrate([200, 100, 200]);
-        }
-    }
-    
-    // АКТИВАЦИЯ ЗВУКА (упрощённая, без AudioContext)
-    async function enableRaciaSound() {
-        if (raciaSoundEnabled) return true;
-        try {
-            const silent = new Audio();
-            silent.volume = 0.01;
-            silent.src = "data:audio/wav;base64,U3RlYWx0aCBibG9i";
-            await silent.play();
-            raciaSoundEnabled = true;
-            console.log('✅ Звук активирован');
-            showToast('🔊 Звук активирован');
-            return true;
-        } catch(e) {
-            console.log('⚠️ Звук активирован кликом');
-            raciaSoundEnabled = true;
-            return true;
         }
     }
     
@@ -1662,7 +1642,7 @@
             if (data?.status === 'accepted') {
                 clearInterval(checkInterval);
                 showToast(`✅ ${currentChat.name} принял звонок!`);
-                await startRaciaTalk(targetId, targetLogin);
+                await startTalkSession(targetId, targetLogin);
                 await ref.remove();
             } else if (data?.status === 'rejected') {
                 clearInterval(checkInterval);
@@ -1681,66 +1661,50 @@
         }, 30000);
     }
     
-    // ПРИЕМ ВХОДЯЩЕГО ЗВОНКА
+    // ПРИЕМ ЗВОНКОВ
     function setupCallListener() {
         if (!currentUser) return;
         
-        db.ref('calls').orderByChild('to').equalTo(currentUser.id).on('child_added', async (snap) => {
+        db.ref('calls').orderByChild('to').equalTo(currentUser.id).on('child_added', (snap) => {
             const call = snap.val();
             if (call && call.status === 'ringing' && !raciaCallActive) {
-                const callId = snap.key;
-                const fromId = call.from;
-                const fromLogin = call.fromLogin;
-                
-                vibrate();
-                showToast(`📞 Входящий звонок от ${fromLogin}`);
-                
-                let contact = contacts.find(c => c.id === fromId);
-                if (!contact) {
-                    const userSnap = await db.ref(`users/${fromId}`).once('value');
-                    const userData = userSnap.val();
-                    if (userData) {
-                        contact = { id: fromId, login: userData.login, name: userData.name, avatar: userData.avatar || '👤' };
-                    }
-                }
-                
-                if (contact) {
-                    const container = document.getElementById('messages');
-                    const notif = document.createElement('div');
-                    notif.className = 'message in';
-                    notif.style.textAlign = 'center';
-                    notif.style.background = '#ff9800';
-                    notif.style.padding = '15px';
-                    notif.style.borderRadius = '20px';
-                    notif.style.margin = '10px';
-                    notif.style.cursor = 'pointer';
-                    notif.id = 'incoming_notif_' + callId;
-                    notif.innerHTML = `
-                        <div><strong>📞 Входящий звонок от ${contact.name}</strong></div>
-                        <div style="display:flex; gap:8px; margin-top:8px; justify-content:center;">
-                            <button onclick="window.acceptCall('${callId}', '${fromId}', '${fromLogin}')" style="background:#4caf50; border:none; padding:8px 16px; border-radius:20px; color:white;">✅ Ответить</button>
-                            <button onclick="window.rejectCall('${callId}')" style="background:#dc3545; border:none; padding:8px 16px; border-radius:20px; color:white;">❌ Отклонить</button>
-                        </div>
-                    `;
-                    container.appendChild(notif);
-                    container.scrollTop = container.scrollHeight;
-                    
-                    if (!currentChat || currentChat.id !== fromId) {
-                        openChat(contact);
-                    }
-                }
+                showIncomingCall(snap.key, call.from, call.fromLogin);
             }
         });
     }
     
-    window.acceptCall = async function(callId, fromId, fromLogin) {
-        document.getElementById('incoming_notif_' + callId)?.remove();
+    function showIncomingCall(callId, fromId, fromLogin) {
+        vibrate();
         
-        await enableRaciaSound();
+        // Показываем в чате если открыт
+        if (currentChat && currentChat.id === fromId) {
+            const container = document.getElementById('messages');
+            const notif = document.createElement('div');
+            notif.className = 'message in';
+            notif.style.textAlign = 'center';
+            notif.style.background = '#ff9800';
+            notif.style.padding = '15px';
+            notif.style.borderRadius = '20px';
+            notif.style.margin = '10px';
+            notif.id = 'incoming_' + callId;
+            notif.innerHTML = `
+                <strong>📞 Входящий звонок от ${fromLogin}</strong><br><br>
+                <button onclick="acceptCall('${callId}', '${fromId}', '${fromLogin}')" style="background:#4caf50; border:none; padding:8px 16px; border-radius:20px; color:white;">✅ Ответить</button>
+                <button onclick="rejectCall('${callId}')" style="background:#dc3545; border:none; padding:8px 16px; border-radius:20px; color:white;">❌ Отклонить</button>
+            `;
+            container.appendChild(notif);
+            container.scrollTop = container.scrollHeight;
+        } else {
+            showToast(`📞 Входящий звонок от ${fromLogin}`);
+        }
+    }
+    
+    window.acceptCall = async function(callId, fromId, fromLogin) {
+        document.getElementById('incoming_' + callId)?.remove();
         await db.ref(`calls/${callId}/status`).set('accepted');
         showToast(`✅ Принимаем звонок от ${fromLogin}`);
         
-        // ДЛЯ ПРИНИМАЮЩЕЙ СТОРОНЫ - ПОКАЗЫВАЕМ КНОПКИ
+        // Показываем кнопки
         document.getElementById('callBtn').style.display = 'none';
         document.getElementById('endCallBtn').style.display = 'flex';
         
@@ -1760,22 +1724,28 @@
             document.getElementById('chatName').innerText = contact.name;
             document.getElementById('chatLogin').innerText = '@' + contact.login;
             document.getElementById('chatContainer').classList.add('active');
-            await startRaciaTalk(fromId, fromLogin);
+            await startTalkSession(fromId, fromLogin);
         }
     };
     
     window.rejectCall = async function(callId) {
-        document.getElementById('incoming_notif_' + callId)?.remove();
+        document.getElementById('incoming_' + callId)?.remove();
         await db.ref(`calls/${callId}/status`).set('rejected');
         showToast(`❌ Звонок отклонен`);
     };
     
-    // НАЧАЛО РАЗГОВОРА
-    async function startRaciaTalk(targetId, targetLogin) {
+    // СЕССИЯ РАЗГОВОРА
+    async function startTalkSession(targetId, targetLogin) {
         if (raciaCallActive) return;
-        
-        await enableRaciaSound();
         raciaCallActive = true;
+        
+        // Активация звука
+        if (!raciaSoundEnabled) {
+            const silent = new Audio();
+            silent.volume = 0.01;
+            silent.play().catch(()=>{});
+            raciaSoundEnabled = true;
+        }
         
         if (!raciaGlobalAudio) {
             raciaGlobalAudio = new Audio();
@@ -1785,14 +1755,14 @@
         try {
             raciaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
             showToast('🎤 Микрофон готов, удерживайте кнопку');
-            const callStatusDiv = document.getElementById('callStatus');
-            if (callStatusDiv) callStatusDiv.innerHTML = '🎙️ РАЗГОВОР';
+            document.getElementById('callStatus').innerHTML = '🎙️ РАЗГОВОР';
         } catch(e) {
             showToast('❌ Нет доступа к микрофону');
             endCall();
             return;
         }
         
+        // Слушаем входящие сообщения
         if (raciaMessagesListener) {
             raciaMessagesListener.off();
         }
@@ -1801,16 +1771,15 @@
             const msg = snap.val();
             if (msg && msg.from !== currentUser.id && raciaCallActive && raciaGlobalAudio) {
                 raciaGlobalAudio.src = msg.data;
-                raciaGlobalAudio.play().catch(e => console.log('Ошибка воспроизведения:', e));
+                raciaGlobalAudio.play().catch(e => console.log('Ошибка:', e));
                 snap.ref.remove();
             }
         });
         
-        // ПОКАЗЫВАЕМ БОЛЬШУЮ КНОПКУ ДЛЯ ВСЕХ
         showTalkButton();
     }
     
-    // КНОПКА ГОВОРИТЬ
+    // БОЛЬШАЯ КНОПКА ГОВОРИТЬ
     function showTalkButton() {
         let talkDiv = document.getElementById('talkButtonContainer');
         if (talkDiv) talkDiv.remove();
@@ -1848,11 +1817,11 @@
         document.body.appendChild(talkDiv);
         
         const talkBtn = document.getElementById('talkBtn');
-        talkBtn.addEventListener('touchstart', startRaciaRecording);
-        talkBtn.addEventListener('touchend', stopRaciaRecording);
-        talkBtn.addEventListener('mousedown', startRaciaRecording);
-        talkBtn.addEventListener('mouseup', stopRaciaRecording);
-        talkBtn.addEventListener('mouseleave', stopRaciaRecording);
+        talkBtn.addEventListener('touchstart', startRecording);
+        talkBtn.addEventListener('touchend', stopRecording);
+        talkBtn.addEventListener('mousedown', startRecording);
+        talkBtn.addEventListener('mouseup', stopRecording);
+        talkBtn.addEventListener('mouseleave', stopRecording);
     }
     
     function hideTalkButton() {
@@ -1860,8 +1829,7 @@
         if (talkDiv) talkDiv.remove();
     }
     
-    // ЗАПИСЬ И ОТПРАВКА
-    function startRaciaRecording() {
+    function startRecording() {
         if (!raciaCallActive || !raciaStream) return;
         if (raciaRecorder && raciaRecorder.state === 'recording') return;
         
@@ -1905,19 +1873,18 @@
         
         setTimeout(() => {
             if (raciaRecorder && raciaRecorder.state === 'recording') {
-                stopRaciaRecording();
+                stopRecording();
             }
         }, 15000);
     }
     
-    function stopRaciaRecording() {
+    function stopRecording() {
         if (raciaRecorder && raciaRecorder.state === 'recording') {
             raciaRecorder.stop();
             raciaRecorder = null;
         }
     }
     
-    // ЗАВЕРШЕНИЕ ЗВОНКА
     async function endCall() {
         showToast('🔴 Завершение звонка...');
         
@@ -1944,13 +1911,9 @@
         
         hideTalkButton();
         
-        const callBtn = document.getElementById('callBtn');
-        const endCallBtn = document.getElementById('endCallBtn');
-        if (callBtn) callBtn.style.display = 'flex';
-        if (endCallBtn) endCallBtn.style.display = 'none';
-        
-        const callStatusDiv = document.getElementById('callStatus');
-        if (callStatusDiv) callStatusDiv.innerHTML = '';
+        document.getElementById('callBtn').style.display = 'flex';
+        document.getElementById('endCallBtn').style.display = 'none';
+        document.getElementById('callStatus').innerHTML = '';
         
         raciaCallWith = null;
         raciaCurrentCallId = null;
@@ -1971,7 +1934,7 @@
         await loadContacts();
         await loadChats();
         await loadAds();
-        setupCallListener();  // ← ДОБАВЛЕНО
+        setupCallListener();
         db.ref(`users/${currentUser.id}/online`).set(true);
         setInterval(() => {
             if (currentUser) db.ref(`users/${currentUser.id}/online`).set(true);
