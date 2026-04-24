@@ -683,6 +683,11 @@
     let mediaRecorder = null;
     let blockedUsers = [];
     
+    // КЭШ
+    let messagesCache = {};      // { contactId: [messages] }
+    let dialogsCache = [];       // кэш списка диалогов
+    let contactsCache = {};      // { contactId: { name, avatar, login } }
+    
     // ========== ИСКОРКИ ==========
     function initSparks() {
         const canvas = document.getElementById('sparks-canvas');
@@ -957,7 +962,12 @@
         }
     }
 
-    async function loadDialogs() {
+    async function loadDialogs(force = false) {
+        if (!force && dialogsCache.length > 0) {
+            renderDialogs(dialogsCache);
+            return;
+        }
+        
         await loadBlockedUsers();
         
         const contactsSnap = await db.ref(`contacts/${currentUser.id}`).once('value');
@@ -965,8 +975,15 @@
         
         if (contactsSnap.exists()) {
             for (const [id, data] of Object.entries(contactsSnap.val())) {
-                const userSnap = await db.ref(`users/${id}`).once('value');
-                const user = userSnap.val();
+                let user = contactsCache[id];
+                if (!user) {
+                    const userSnap = await db.ref(`users/${id}`).once('value');
+                    user = userSnap.val();
+                    if (user) {
+                        contactsCache[id] = user;
+                    }
+                }
+                
                 if (user && !isBlocked(id)) {
                     const lastMsgSnap = await db.ref(`messages/${currentUser.id}/${id}`).orderByKey().limitToLast(1).once('value');
                     let lastMsg = null;
@@ -992,6 +1009,7 @@
         }
         
         allDialogs.sort((a, b) => b.lastMsgTime - a.lastMsgTime);
+        dialogsCache = allDialogs;
         window.lastDialogs = allDialogs;
         renderDialogs(allDialogs);
     }
@@ -1389,26 +1407,34 @@
         
         db.ref(`messages/${currentUser.id}`).on('child_added', async (snap) => {
             const contactId = snap.key;
-            const contact = contacts.find(c => c.id === contactId);
+            const msgs = snap.val();
+            const lastMsg = Object.values(msgs).sort((a, b) => b.timestamp - a.timestamp)[0];
             
-            if (contact && !isBlocked(contactId)) {
-                const msgs = snap.val();
-                const lastMsg = Object.values(msgs).sort((a, b) => b.timestamp - a.timestamp)[0];
-                if (lastMsg && lastMsg.from !== currentUser.id) {
-                    showToast(`📨 ${contact.name}: ${lastMsg.content?.substring(0, 50) || 'Файл'}`);
-                    // Звук уведомления
-                    try {
-                        const notifSound = new Audio();
-                        notifSound.src = "https://www.soundjay.com/misc/sounds/notification-01.mp3";
-                        notifSound.volume = 0.3;
-                        notifSound.play();
-                    } catch(e) {}
-                }
+            // Обновляем кэш диалогов (принудительно при новом сообщении)
+            dialogsCache = [];
+            await loadDialogs();
+            
+            if (lastMsg && lastMsg.from !== currentUser.id) {
+                showToast(`📨 Новое сообщение`);
+                try {
+                    const notifSound = new Audio();
+                    notifSound.src = "https://www.soundjay.com/misc/sounds/notification-01.mp3";
+                    notifSound.volume = 0.3;
+                    notifSound.play();
+                } catch(e) {}
             }
             
-            await loadDialogs();
             if (currentChat && contactId === currentChat.id && !isBlocked(contactId)) {
-                loadMessages();
+                // Обновляем кэш сообщений для открытого чата
+                if (messagesCache[contactId]) {
+                    const newMsg = Object.values(msgs).find(m => m.timestamp === lastMsg?.timestamp);
+                    if (newMsg && newMsg.from !== currentUser.id) {
+                        messagesCache[contactId].push({ id: Object.keys(msgs).find(k => msgs[k] === newMsg), ...newMsg });
+                        renderMessages(messagesCache[contactId]);
+                    }
+                } else {
+                    loadMessages();
+                }
             }
         });
     }
@@ -1454,15 +1480,33 @@
             return;
         }
         
+        const contactId = currentChat.id;
         const container = document.getElementById('messages');
-        container.innerHTML = '<div style="text-align:center; padding:40px;">⏳ Загрузка сообщений...</div>';
         
-        const snapshot = await db.ref(`messages/${currentUser.id}/${currentChat.id}`).orderByKey().limitToLast(30).once('value');
+        // Показываем из кэша если есть
+        if (messagesCache[contactId]) {
+            renderMessages(messagesCache[contactId]);
+            // Обновляем в фоне
+            refreshMessages(contactId);
+            return;
+        }
+        
+        container.innerHTML = '<div style="text-align:center; padding:40px;">⏳ Загрузка...</div>';
+        
+        const snapshot = await db.ref(`messages/${currentUser.id}/${contactId}`).orderByKey().limitToLast(30).once('value');
         const messages = [];
         snapshot.forEach(child => {
             messages.push({ id: child.key, ...child.val() });
         });
         messages.sort((a, b) => a.timestamp - b.timestamp);
+        
+        messagesCache[contactId] = messages;
+        renderMessages(messages);
+    }
+    
+    function renderMessages(messages) {
+        const container = document.getElementById('messages');
+        if (!container) return;
         
         if (messages.length === 0) {
             container.innerHTML = '<div style="text-align:center; padding:40px;">💬 Нет сообщений</div>';
@@ -1481,6 +1525,21 @@
         container.scrollTop = container.scrollHeight;
     }
     
+    async function refreshMessages(contactId) {
+        const snapshot = await db.ref(`messages/${currentUser.id}/${contactId}`).orderByKey().limitToLast(30).once('value');
+        const messages = [];
+        snapshot.forEach(child => {
+            messages.push({ id: child.key, ...child.val() });
+        });
+        messages.sort((a, b) => a.timestamp - b.timestamp);
+        
+        messagesCache[contactId] = messages;
+        
+        if (currentChat && currentChat.id === contactId) {
+            renderMessages(messages);
+        }
+    }
+    
     async function sendMessage() {
         const text = document.getElementById('messageInput').value.trim();
         if (!text || !currentChat || isBlocked(currentChat.id)) return;
@@ -1496,6 +1555,7 @@
                     added_at: Date.now()
                 });
                 showToast(`✅ ${userData.name} добавлен в контакты`);
+                dialogsCache = [];
                 await loadDialogs();
             }
         }
@@ -1514,9 +1574,19 @@
             db.ref(`messages/${currentUser.id}/${currentChat.id}/${msgId}`).set(msgData)
         ]);
         
-        document.getElementById('messageInput').value = '';
-        await loadMessages();
+        // Обновляем кэш сообщений
+        if (messagesCache[currentChat.id]) {
+            messagesCache[currentChat.id].push({ id: msgId, ...msgData });
+            renderMessages(messagesCache[currentChat.id]);
+        } else {
+            await loadMessages();
+        }
+        
+        // Обновляем кэш диалогов
+        dialogsCache = [];
         await loadDialogs();
+        
+        document.getElementById('messageInput').value = '';
     }
     
     function selectFile() { document.getElementById('fileInput').click(); }
