@@ -1454,14 +1454,16 @@
             return;
         }
         
-        const snapshot = await db.ref(`messages/${currentUser.id}/${currentChat.id}`).orderByKey().limitToLast(50).once('value');
+        const container = document.getElementById('messages');
+        container.innerHTML = '<div style="text-align:center; padding:40px;">⏳ Загрузка сообщений...</div>';
+        
+        const snapshot = await db.ref(`messages/${currentUser.id}/${currentChat.id}`).orderByKey().limitToLast(30).once('value');
         const messages = [];
         snapshot.forEach(child => {
             messages.push({ id: child.key, ...child.val() });
         });
         messages.sort((a, b) => a.timestamp - b.timestamp);
         
-        const container = document.getElementById('messages');
         if (messages.length === 0) {
             container.innerHTML = '<div style="text-align:center; padding:40px;">💬 Нет сообщений</div>';
         } else {
@@ -1690,10 +1692,10 @@
             console.log('Звук не воспроизвелся:', e);
         }
         
-        // Убираем старое уведомление если есть
+        // Убираем старое уведомление
         document.getElementById('global_incoming_' + callId)?.remove();
         
-        // Создаем глобальное уведомление (поверх всего)
+        // Глобальное уведомление
         const notif = document.createElement('div');
         notif.id = 'global_incoming_' + callId;
         notif.style.cssText = `
@@ -1717,7 +1719,6 @@
         `;
         document.body.appendChild(notif);
         
-        // Автоматически удаляем через 30 секунд
         setTimeout(() => {
             notif.remove();
             if (window.currentRingtone) {
@@ -1727,26 +1728,6 @@
         }, 30000);
         
         showToast(`📞 Входящий звонок от ${fromLogin}`);
-        
-        // Дополнительно показываем в чате если он открыт
-        if (currentChat && currentChat.id === fromId) {
-            const container = document.getElementById('messages');
-            const chatNotif = document.createElement('div');
-            chatNotif.className = 'message in';
-            chatNotif.style.textAlign = 'center';
-            chatNotif.style.background = '#ff9800';
-            chatNotif.style.padding = '15px';
-            chatNotif.style.borderRadius = '20px';
-            chatNotif.style.margin = '10px';
-            chatNotif.id = 'incoming_' + callId;
-            chatNotif.innerHTML = `
-                <strong>📞 Входящий звонок от ${fromLogin}</strong><br><br>
-                <button onclick="acceptCall('${callId}', '${fromId}', '${fromLogin}')" style="background:#4caf50; border:none; padding:8px 16px; border-radius:20px; color:white;">✅ Ответить</button>
-                <button onclick="rejectCall('${callId}')" style="background:#dc3545; border:none; padding:8px 16px; border-radius:20px; color:white;">❌ Отклонить</button>
-            `;
-            container.appendChild(chatNotif);
-            container.scrollTop = container.scrollHeight;
-        }
     }
     
     window.acceptCall = async function(callId, fromId, fromLogin) {
@@ -1756,7 +1737,6 @@
             window.currentRingtone = null;
         }
         
-        document.getElementById('incoming_' + callId)?.remove();
         document.getElementById('global_incoming_' + callId)?.remove();
         await db.ref(`calls/${callId}/status`).set('accepted');
         showToast(`✅ Принимаем звонок от ${fromLogin}`);
@@ -1774,7 +1754,7 @@
             if (userData) {
                 contact = { id: fromId, login: userData.login, name: userData.name, avatar: userData.avatar || '👤' };
                 await db.ref(`contacts/${currentUser.id}/${fromId}`).set({ name: userData.name, login: userData.login, added_at: Date.now() });
-                await loadContacts();
+                await loadDialogs();
             }
         }
         
@@ -1785,6 +1765,9 @@
             document.getElementById('chatContainer').classList.add('active');
             await startTalkSession(fromId, fromLogin);
         }
+        
+        // Показываем кнопку "ГОВОРИТЬ" для принимающей стороны
+        showTalkButton();
     };
     
     window.rejectCall = async function(callId) {
