@@ -1676,6 +1676,18 @@
     function showIncomingCall(callId, fromId, fromLogin) {
         vibrate();
         
+        // Звук звонка
+        try {
+            const ringtone = new Audio();
+            ringtone.src = "https://www.soundjay.com/misc/sounds/phone-ringing-01.mp3";
+            ringtone.volume = 0.5;
+            ringtone.loop = true;
+            ringtone.play();
+            window.currentRingtone = ringtone;
+        } catch(e) {
+            console.log('Звук не воспроизвелся:', e);
+        }
+        
         // Убираем старое уведомление если есть
         document.getElementById('global_incoming_' + callId)?.remove();
         
@@ -1706,6 +1718,10 @@
         // Автоматически удаляем через 30 секунд
         setTimeout(() => {
             notif.remove();
+            if (window.currentRingtone) {
+                window.currentRingtone.pause();
+                window.currentRingtone = null;
+            }
         }, 30000);
         
         showToast(`📞 Входящий звонок от ${fromLogin}`);
@@ -1732,16 +1748,20 @@
     }
     
     window.acceptCall = async function(callId, fromId, fromLogin) {
+        // Остановить звук звонка
+        if (window.currentRingtone) {
+            window.currentRingtone.pause();
+            window.currentRingtone = null;
+        }
+        
         document.getElementById('incoming_' + callId)?.remove();
         document.getElementById('global_incoming_' + callId)?.remove();
         await db.ref(`calls/${callId}/status`).set('accepted');
         showToast(`✅ Принимаем звонок от ${fromLogin}`);
         
-        // Устанавливаем переменные для принимающей стороны
         raciaCallWith = { id: fromId, login: fromLogin };
         raciaCurrentCallId = callId;
         
-        // Показываем кнопки
         document.getElementById('callBtn').style.display = 'none';
         document.getElementById('endCallBtn').style.display = 'flex';
         
@@ -1766,6 +1786,12 @@
     };
     
     window.rejectCall = async function(callId) {
+        // Остановить звук звонка
+        if (window.currentRingtone) {
+            window.currentRingtone.pause();
+            window.currentRingtone = null;
+        }
+        
         document.getElementById('incoming_' + callId)?.remove();
         document.getElementById('global_incoming_' + callId)?.remove();
         await db.ref(`calls/${callId}/status`).set('rejected');
