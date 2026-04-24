@@ -1676,24 +1676,59 @@
     function showIncomingCall(callId, fromId, fromLogin) {
         vibrate();
         
-        // Показываем уведомление в чате (всегда)
-        const container = document.getElementById('messages');
+        // Убираем старое уведомление если есть
+        document.getElementById('global_incoming_' + callId)?.remove();
+        
+        // Создаем глобальное уведомление (поверх всего)
         const notif = document.createElement('div');
-        notif.className = 'message in';
-        notif.style.textAlign = 'center';
-        notif.style.background = '#ff9800';
-        notif.style.padding = '15px';
-        notif.style.borderRadius = '20px';
-        notif.style.margin = '10px';
-        notif.id = 'incoming_' + callId;
+        notif.id = 'global_incoming_' + callId;
+        notif.style.cssText = `
+            position: fixed;
+            top: 80px;
+            left: 20px;
+            right: 20px;
+            background: #ff9800;
+            color: white;
+            padding: 15px;
+            border-radius: 20px;
+            text-align: center;
+            z-index: 1000;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            animation: pulse 1s infinite;
+        `;
         notif.innerHTML = `
             <strong>📞 Входящий звонок от ${fromLogin}</strong><br><br>
-            <button onclick="acceptCall('${callId}', '${fromId}', '${fromLogin}')" style="background:#4caf50; border:none; padding:8px 16px; border-radius:20px; color:white;">✅ Ответить</button>
-            <button onclick="rejectCall('${callId}')" style="background:#dc3545; border:none; padding:8px 16px; border-radius:20px; color:white;">❌ Отклонить</button>
+            <button onclick="window.acceptCall('${callId}', '${fromId}', '${fromLogin}')" style="background:#4caf50; border:none; padding:8px 16px; border-radius:20px; color:white; margin-right:10px;">✅ Ответить</button>
+            <button onclick="window.rejectCall('${callId}')" style="background:#dc3545; border:none; padding:8px 16px; border-radius:20px; color:white;">❌ Отклонить</button>
         `;
-        container.appendChild(notif);
-        container.scrollTop = container.scrollHeight;
+        document.body.appendChild(notif);
+        
+        // Автоматически удаляем через 30 секунд
+        setTimeout(() => {
+            notif.remove();
+        }, 30000);
+        
         showToast(`📞 Входящий звонок от ${fromLogin}`);
+        
+        // Дополнительно показываем в чате если он открыт
+        if (currentChat && currentChat.id === fromId) {
+            const container = document.getElementById('messages');
+            const chatNotif = document.createElement('div');
+            chatNotif.className = 'message in';
+            chatNotif.style.textAlign = 'center';
+            chatNotif.style.background = '#ff9800';
+            chatNotif.style.padding = '15px';
+            chatNotif.style.borderRadius = '20px';
+            chatNotif.style.margin = '10px';
+            chatNotif.id = 'incoming_' + callId;
+            chatNotif.innerHTML = `
+                <strong>📞 Входящий звонок от ${fromLogin}</strong><br><br>
+                <button onclick="acceptCall('${callId}', '${fromId}', '${fromLogin}')" style="background:#4caf50; border:none; padding:8px 16px; border-radius:20px; color:white;">✅ Ответить</button>
+                <button onclick="rejectCall('${callId}')" style="background:#dc3545; border:none; padding:8px 16px; border-radius:20px; color:white;">❌ Отклонить</button>
+            `;
+            container.appendChild(chatNotif);
+            container.scrollTop = container.scrollHeight;
+        }
     }
     
     window.acceptCall = async function(callId, fromId, fromLogin) {
