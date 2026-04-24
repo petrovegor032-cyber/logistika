@@ -1147,6 +1147,34 @@
                 const { latitude, longitude } = pos.coords;
                 userMarker = L.marker([latitude, longitude]).addTo(map);
                 map.setView([latitude, longitude], 15);
+                
+                // ОБНОВЛЯЕМ МАРКЕРЫ ПРИ ДВИЖЕНИИ
+                navigator.geolocation.watchPosition(async (newPos) => {
+                    if (userMarker) {
+                        userMarker.setLatLng([newPos.coords.latitude, newPos.coords.longitude]);
+                        map.setView([newPos.coords.latitude, newPos.coords.longitude], 15);
+                    }
+                    
+                    // Обновляем позицию в объявлениях пользователя
+                    if (currentUser) {
+                        const adsSnap = await db.ref('ads').orderByChild('userId').equalTo(currentUser.id).once('value');
+                        adsSnap.forEach(ad => {
+                            db.ref(`ads/${ad.key}/lat`).set(newPos.coords.latitude);
+                            db.ref(`ads/${ad.key}/lng`).set(newPos.coords.longitude);
+                        });
+                    }
+                    
+                    // Перерисовываем карту
+                    if (map) {
+                        markers.forEach(m => map.removeLayer(m));
+                        markers = [];
+                        renderAds();
+                    }
+                }, null, { enableHighAccuracy: true, maximumAge: 30000 });
+                
+            }, (error) => {
+                console.log('Ошибка геолокации:', error);
+                showToast('Включите геолокацию');
             });
         }
     }
@@ -1189,7 +1217,9 @@
             icon: selectedAdIcon, text, price, photoUrl,
             lat: pos.lat, lng: pos.lng,
             userId: currentUser.id, userLogin: currentUser.login,
-            timestamp: Date.now()
+            timestamp: Date.now(),
+            expiresAt: Date.now() + 24 * 60 * 60 * 1000,  // +24 часа
+            paused: false
         });
         
         showToast('Объявление опубликовано');
@@ -1200,7 +1230,6 @@
         
         await loadAds();
         
-        // Обновляем маркеры на карте
         if (map) {
             markers.forEach(m => map.removeLayer(m));
             markers = [];
@@ -1211,11 +1240,26 @@
     async function loadAds() {
         const snapshot = await db.ref('ads').once('value');
         allAds = [];
+        
+        // Получаем статусы онлайн всех пользователей один раз
+        const usersOnline = {};
+        const usersSnap = await db.ref('users').once('value');
+        usersSnap.forEach(child => {
+            usersOnline[child.key] = child.val().online === true;
+        });
+        
         if (snapshot.exists()) {
             snapshot.forEach(child => {
-                allAds.push({ id: child.key, ...child.val() });
+                const ad = child.val();
+                const userOnline = usersOnline[ad.userId] === true;
+                
+                // Фильтр: не на паузе, не истекло, автор онлайн
+                if (!ad.paused && ad.expiresAt > Date.now() && userOnline) {
+                    allAds.push({ id: child.key, ...ad });
+                }
             });
         }
+        
         renderAds();
     }
     
@@ -1275,22 +1319,63 @@
     async function showMyAds() {
         await loadAds();
         const myAds = allAds.filter(ad => ad.userId === currentUser.id);
-        document.getElementById('myAdsList').innerHTML = myAds.map(ad => `
-            <div class="ad-card">
+        
+        // Также показываем объявления на паузе и истекшие, но с пометкой
+        const snapshot = await db.ref('ads').once('value');
+        const allMyAds = [];
+        snapshot.forEach(child => {
+            const ad = child.val();
+            if (ad.userId === currentUser.id) {
+                allMyAds.push({ id: child.key, ...ad });
+            }
+        });
+        
+        document.getElementById('myAdsList').innerHTML = allMyAds.map(ad => `
+            <div class="ad-card" style="opacity: ${ad.paused || ad.expiresAt < Date.now() ? '0.5' : '1'}">
                 <div style="display:flex; align-items:center; gap:8px;">
                     <span style="font-size:32px;">${ad.icon || '📌'}</span>
                     <div style="flex:1">
                         <b>${escapeHtml(ad.text)}</b><br>
                         ${ad.price ? `💰 ${ad.price}₽<br>` : ''}
-                        <small>⏱️ ${Math.floor((Date.now() - ad.timestamp) / 1000 / 60 / 60)} ч назад</small>
+                        <small>⏱️ ${Math.floor((ad.expiresAt - Date.now()) / 1000 / 60 / 60)} ч осталось</small>
+                        ${ad.paused ? '<small style="color:#ff9800;"> ⏸ На паузе</small>' : ''}
+                        ${ad.expiresAt < Date.now() ? '<small style="color:#f44336;"> ❌ Истекло</small>' : ''}
                     </div>
-                    <button onclick="deleteAd('${ad.id}'); closeModal('myAdsModal')" style="background:none; border:none; font-size:20px;">🗑️</button>
+                    <div style="display:flex; flex-direction:column; gap:4px;">
+                        ${ad.expiresAt > Date.now() && !ad.paused ? `<button onclick="extendAd('${ad.id}')" style="background:none; border:none; font-size:20px;">🕒</button>` : ''}
+                        ${ad.expiresAt > Date.now() ? `<button onclick="pauseAd('${ad.id}', ${ad.paused})" style="background:none; border:none; font-size:20px;">${ad.paused ? '▶️' : '⏸'}</button>` : ''}
+                        <button onclick="deleteAd('${ad.id}'); closeModal('myAdsModal')" style="background:none; border:none; font-size:20px;">🗑️</button>
+                    </div>
                 </div>
                 ${ad.photoUrl ? `<img src="${ad.photoUrl}" style="max-width:100%; border-radius:12px; margin-top:8px;">` : ''}
             </div>
         `).join('');
-        if (myAds.length === 0) document.getElementById('myAdsList').innerHTML = '<div style="text-align:center">📭 Нет объявлений</div>';
+        
+        if (allMyAds.length === 0) document.getElementById('myAdsList').innerHTML = '<div style="text-align:center">📭 Нет объявлений</div>';
         openModal('myAdsModal');
+    }
+
+    async function extendAd(adId) {
+        await db.ref(`ads/${adId}`).update({
+            expiresAt: Date.now() + 24 * 60 * 60 * 1000
+        });
+        showToast('🕒 Объявление продлено на 24 часа');
+        await showMyAds();
+        await loadAds();
+    }
+    
+    async function pauseAd(adId, currentlyPaused) {
+        await db.ref(`ads/${adId}`).update({
+            paused: !currentlyPaused
+        });
+        showToast(currentlyPaused ? '▶️ Объявление активировано' : '⏸ Объявление на паузе');
+        await showMyAds();
+        await loadAds();
+        
+        if (map) {
+            markers.forEach(m => map.removeLayer(m));
+            renderAds();
+        }
     }
     
     async function openChatFromAd(userId) {
