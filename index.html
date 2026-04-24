@@ -783,6 +783,21 @@
         }
     }
     
+    // Активация звука по касанию (глобальная функция)
+    function activateSoundOnTouch() {
+        const handler = () => {
+            if (!window.raciaSoundEnabled) {
+                const silent = new Audio();
+                silent.volume = 0.01;
+                silent.play().catch(()=>{});
+                window.raciaSoundEnabled = true;
+                console.log('✅ Звук активирован касанием');
+            }
+        };
+        document.body.addEventListener('touchstart', handler, { once: true });
+        document.body.addEventListener('mousedown', handler, { once: true });
+    }
+    
     // ========== МЕНЮ ==========
     function toggleMenu() {
         document.getElementById('sideMenu').classList.toggle('active');
