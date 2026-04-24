@@ -992,6 +992,7 @@
         }
         
         allDialogs.sort((a, b) => b.lastMsgTime - a.lastMsgTime);
+        window.lastDialogs = allDialogs;
         renderDialogs(allDialogs);
     }
     
