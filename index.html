@@ -888,6 +888,18 @@
             }
         }, { once: true });
     }
+
+    document.getElementById('dialogsSearch')?.addEventListener('input', () => {
+        const search = document.getElementById('dialogsSearch').value.toLowerCase();
+        if (window.lastDialogs) {
+            const filtered = window.lastDialogs.filter(d => 
+                d.name.toLowerCase().includes(search) || 
+                d.login.toLowerCase().includes(search)
+            );
+            renderDialogs(filtered);
+        }
+    });
+    document.getElementById('adSearch')?.addEventListener('input', () => renderAds());
     
     function checkAuth() {
         const saved = localStorage.getItem('user');
@@ -1389,15 +1401,23 @@
                 const lastMsg = Object.values(msgs).sort((a, b) => b.timestamp - a.timestamp)[0];
                 if (lastMsg && lastMsg.from !== currentUser.id) {
                     showToast(`📨 ${contact.name}: ${lastMsg.content?.substring(0, 50) || 'Файл'}`);
+                    // Звук уведомления
+                    try {
+                        const notifSound = new Audio();
+                        notifSound.src = "https://www.soundjay.com/misc/sounds/notification-01.mp3";
+                        notifSound.volume = 0.3;
+                        notifSound.play();
+                    } catch(e) {}
                 }
             }
             
-            await loadChats();
+            await loadDialogs();
             if (currentChat && contactId === currentChat.id && !isBlocked(contactId)) {
                 loadMessages();
             }
         });
-    }    
+    }
+    
     function openChat(contact) {
         if (!contact) return;
         if (isBlocked(contact.id)) {
