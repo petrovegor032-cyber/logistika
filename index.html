@@ -1938,9 +1938,9 @@
         if (!currentUser) return;
         await loadBlockedUsers();
         await loadContacts();
-        await loadChats();
+        loadChats();
         await loadAds();
-        setupCallListener();  // ← ДОБАВИТЬ ЭТУ СТРОКУ
+        setupCallListener();  // ← ДОБАВЛЕНО
         db.ref(`users/${currentUser.id}/online`).set(true);
         setInterval(() => {
             if (currentUser) db.ref(`users/${currentUser.id}/online`).set(true);
