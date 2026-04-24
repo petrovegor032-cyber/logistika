@@ -944,6 +944,64 @@
             blockedUsers = Object.keys(snapshot.val());
         }
     }
+
+    async function loadDialogs() {
+        await loadBlockedUsers();
+        
+        const contactsSnap = await db.ref(`contacts/${currentUser.id}`).once('value');
+        const allDialogs = [];
+        
+        if (contactsSnap.exists()) {
+            for (const [id, data] of Object.entries(contactsSnap.val())) {
+                const userSnap = await db.ref(`users/${id}`).once('value');
+                const user = userSnap.val();
+                if (user && !isBlocked(id)) {
+                    const lastMsgSnap = await db.ref(`messages/${currentUser.id}/${id}`).orderByKey().limitToLast(1).once('value');
+                    let lastMsg = null;
+                    let lastMsgTime = 0;
+                    if (lastMsgSnap.exists()) {
+                        lastMsgSnap.forEach(msg => {
+                            lastMsg = msg.val();
+                            lastMsgTime = lastMsg.timestamp || 0;
+                        });
+                    }
+                    
+                    allDialogs.push({
+                        id,
+                        login: user.login,
+                        name: data.name || user.login,
+                        avatar: user.avatar || '👤',
+                        online: user.online || false,
+                        lastMsg,
+                        lastMsgTime
+                    });
+                }
+            }
+        }
+        
+        allDialogs.sort((a, b) => b.lastMsgTime - a.lastMsgTime);
+        renderDialogs(allDialogs);
+    }
+    
+    function renderDialogs(dialogs) {
+        const search = document.getElementById('dialogsSearch')?.value?.toLowerCase() || '';
+        const filtered = dialogs.filter(d => d.name.toLowerCase().includes(search) || d.login.toLowerCase().includes(search));
+        
+        document.getElementById('dialogsList').innerHTML = filtered.map(d => `
+            <div class="contact-item" onclick='openChat(${JSON.stringify(d).replace(/"/g, '&quot;')})'>
+                <div class="contact-avatar">${d.avatar}<span class="online-indicator" style="background: ${d.online ? '#4caf50' : '#888'}"></span></div>
+                <div style="flex:1">
+                    <b>${escapeHtml(d.name)}</b><br>
+                    <small>@${d.login}</small>
+                    ${d.lastMsg ? `<small style="display:block; opacity:0.6;">${d.lastMsg.type === 'text' ? (d.lastMsg.content || '').substring(0, 30) : '📎 Вложение'}</small>` : ''}
+                </div>
+                <div style="display:flex; gap:4px;">
+                    <button class="edit-contact" onclick="editContact(${JSON.stringify(d).replace(/"/g, '&quot;')}, event)" style="background:none; border:none; color:#ffcc00; font-size:20px;">✏️</button>
+                    <button class="delete-contact" onclick="deleteContact('${d.id}', event)" style="background:none; border:none; color:#ff4444; font-size:20px;">🗑️</button>
+                </div>
+            </div>
+        `).join('');
+    }
     
     async function toggleBlockUser() {
         if (!currentChat) return;
@@ -1289,20 +1347,7 @@
             }
         }
     }
-    
-    async function loadContacts() {
-        const snapshot = await db.ref(`contacts/${currentUser.id}`).once('value');
-        contacts = [];
-        if (snapshot.exists()) {
-            for (const [id, data] of Object.entries(snapshot.val())) {
-                const userSnap = await db.ref(`users/${id}`).once('value');
-                const user = userSnap.val();
-                if (user) contacts.push({ id, login: user.login, name: data.name || user.login, avatar: user.avatar || '👤' });
-            }
-        }
-        renderContacts();
-    }
-    
+        
     async function deleteContact(contactId, event) {
         event.stopPropagation();
         if (!confirm('Удалить контакт?')) return;
@@ -1330,25 +1375,7 @@
         await loadContacts();
         await loadChats();
     }
-    
-    function renderContacts() {
-        const search = document.getElementById('contactSearch')?.value?.toLowerCase() || '';
-        const filtered = contacts.filter(c => c.name.toLowerCase().includes(search));
-        document.getElementById('contactsList').innerHTML = filtered.map(c => `
-            <div class="contact-item" onclick='openChat(${JSON.stringify(c).replace(/"/g, '&quot;')})'>
-                <div class="contact-avatar">${c.avatar}<span class="online-indicator"></span></div>
-                <div style="flex:1">
-                    <b>${escapeHtml(c.name)}</b><br>
-                    <small>@${c.login}</small>
-                </div>
-                <div class="contact-actions">
-                    <button class="edit-contact" onclick="editContact(${JSON.stringify(c).replace(/"/g, '&quot;')}, event)">✏️</button>
-                    <button class="delete-contact" onclick="deleteContact('${c.id}', event)">🗑️</button>
-                </div>
-            </div>
-        `).join('');
-    }
-    
+        
     // ========== ЧАТЫ ==========
     function setupMessageListener() {
         if (!currentUser) return;
@@ -1370,41 +1397,7 @@
                 loadMessages();
             }
         });
-    }
-    
-    async function loadChats() {
-        await loadBlockedUsers();
-        
-        const snapshot = await db.ref(`messages/${currentUser.id}`).once('value');
-        chats = [];
-        if (snapshot.exists()) {
-            for (const [contactId, msgs] of Object.entries(snapshot.val())) {
-                const contact = contacts.find(c => c.id === contactId);
-                if (contact && !isBlocked(contactId)) {
-                    const lastMsg = Object.values(msgs).sort((a, b) => b.timestamp - a.timestamp)[0];
-                    chats.push({ contact, lastMsg });
-                }
-            }
-        }
-        chats.sort((a, b) => b.lastMsg.timestamp - a.lastMsg.timestamp);
-        renderChats();
-    }
-    
-    function renderChats() {
-        const search = document.getElementById('chatSearch')?.value?.toLowerCase() || '';
-        const filtered = chats.filter(c => c.contact.name.toLowerCase().includes(search));
-        document.getElementById('chatsList').innerHTML = filtered.map(c => `
-            <div class="contact-item" onclick='openChat(${JSON.stringify(c.contact).replace(/"/g, '&quot;')})'>
-                <div class="contact-avatar">${c.contact.avatar}<span class="online-indicator"></span></div>
-                <div style="flex:1">
-                    <b>${escapeHtml(c.contact.name)}</b><br>
-                    <small>${c.lastMsg.type === 'text' ? (c.lastMsg.content || '').substring(0, 30) : '📎 Вложение'}</small>
-                </div>
-                <small>${new Date(c.lastMsg.timestamp).toLocaleTimeString()}</small>
-            </div>
-        `).join('');
-    }
-    
+    }    
     function openChat(contact) {
         if (!contact) return;
         if (isBlocked(contact.id)) {
@@ -1989,8 +1982,7 @@
     async function loadData() {
         if (!currentUser) return;
         await loadBlockedUsers();
-        await loadContacts();
-        await loadChats();
+        await loadDialogs();  // было loadContacts()
         await loadAds();
         setupCallListener();
         db.ref(`users/${currentUser.id}/online`).set(true);
