@@ -1676,33 +1676,34 @@
     function showIncomingCall(callId, fromId, fromLogin) {
         vibrate();
         
-        // Показываем в чате если открыт
-        if (currentChat && currentChat.id === fromId) {
-            const container = document.getElementById('messages');
-            const notif = document.createElement('div');
-            notif.className = 'message in';
-            notif.style.textAlign = 'center';
-            notif.style.background = '#ff9800';
-            notif.style.padding = '15px';
-            notif.style.borderRadius = '20px';
-            notif.style.margin = '10px';
-            notif.id = 'incoming_' + callId;
-            notif.innerHTML = `
-                <strong>📞 Входящий звонок от ${fromLogin}</strong><br><br>
-                <button onclick="acceptCall('${callId}', '${fromId}', '${fromLogin}')" style="background:#4caf50; border:none; padding:8px 16px; border-radius:20px; color:white;">✅ Ответить</button>
-                <button onclick="rejectCall('${callId}')" style="background:#dc3545; border:none; padding:8px 16px; border-radius:20px; color:white;">❌ Отклонить</button>
-            `;
-            container.appendChild(notif);
-            container.scrollTop = container.scrollHeight;
-        } else {
-            showToast(`📞 Входящий звонок от ${fromLogin}`);
-        }
+        // Показываем уведомление в чате (всегда)
+        const container = document.getElementById('messages');
+        const notif = document.createElement('div');
+        notif.className = 'message in';
+        notif.style.textAlign = 'center';
+        notif.style.background = '#ff9800';
+        notif.style.padding = '15px';
+        notif.style.borderRadius = '20px';
+        notif.style.margin = '10px';
+        notif.id = 'incoming_' + callId;
+        notif.innerHTML = `
+            <strong>📞 Входящий звонок от ${fromLogin}</strong><br><br>
+            <button onclick="acceptCall('${callId}', '${fromId}', '${fromLogin}')" style="background:#4caf50; border:none; padding:8px 16px; border-radius:20px; color:white;">✅ Ответить</button>
+            <button onclick="rejectCall('${callId}')" style="background:#dc3545; border:none; padding:8px 16px; border-radius:20px; color:white;">❌ Отклонить</button>
+        `;
+        container.appendChild(notif);
+        container.scrollTop = container.scrollHeight;
+        showToast(`📞 Входящий звонок от ${fromLogin}`);
     }
     
     window.acceptCall = async function(callId, fromId, fromLogin) {
         document.getElementById('incoming_' + callId)?.remove();
         await db.ref(`calls/${callId}/status`).set('accepted');
         showToast(`✅ Принимаем звонок от ${fromLogin}`);
+        
+        // Устанавливаем переменные для принимающей стороны
+        raciaCallWith = { id: fromId, login: fromLogin };
+        raciaCurrentCallId = callId;
         
         // Показываем кнопки
         document.getElementById('callBtn').style.display = 'none';
