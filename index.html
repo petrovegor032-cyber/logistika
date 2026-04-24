@@ -1074,8 +1074,8 @@
         localStorage.setItem('user', JSON.stringify(currentUser));
         showToast('Профиль сохранен');
         closeModal('profileModal');
-        loadContacts();
-        loadChats();
+        loadDialogs();  // вместо loadContacts()
+        // loadChats(); - удалить
     }
     
     // ========== СТАТУС ==========
