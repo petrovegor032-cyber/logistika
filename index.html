@@ -836,13 +836,13 @@
         setupMessageListener();
         showToast('Регистрация успешна!');
         
-        // Активация звука по касанию
-        document.body.addEventListener('touchstart', () => {
-            if (!window.raciaSoundEnabled) enableRaciaSound();
-        }, { once: true });
-        document.body.addEventListener('mousedown', () => {
-            if (!window.raciaSoundEnabled) enableRaciaSound();
-        }, { once: true });
+        // Активация звука
+        if (!window.raciaSoundEnabled) {
+            const silent = new Audio();
+            silent.volume = 0.01;
+            silent.play().catch(()=>{});
+            window.raciaSoundEnabled = true;
+        }
     }
     
     async function login() {
@@ -866,13 +866,13 @@
         setupMessageListener();
         showToast('Добро пожаловать!');
         
-        // Активация звука по касанию
-        document.body.addEventListener('touchstart', () => {
-            if (!window.raciaSoundEnabled) enableRaciaSound();
-        }, { once: true });
-        document.body.addEventListener('mousedown', () => {
-            if (!window.raciaSoundEnabled) enableRaciaSound();
-        }, { once: true });
+        // Активация звука
+        if (!window.raciaSoundEnabled) {
+            const silent = new Audio();
+            silent.volume = 0.01;
+            silent.play().catch(()=>{});
+            window.raciaSoundEnabled = true;
+        }
     }
     
     function checkAuth() {
@@ -885,13 +885,13 @@
             setupMessageListener();
             requestNotificationPermission();
             
-            // Активация звука по касанию
-            document.body.addEventListener('touchstart', () => {
-                if (!window.raciaSoundEnabled) enableRaciaSound();
-            }, { once: true });
-            document.body.addEventListener('mousedown', () => {
-                if (!window.raciaSoundEnabled) enableRaciaSound();
-            }, { once: true });
+            // Активация звука
+            if (!window.raciaSoundEnabled) {
+                const silent = new Audio();
+                silent.volume = 0.01;
+                silent.play().catch(()=>{});
+                window.raciaSoundEnabled = true;
+            }
         } else {
             openModal('authModal');
         }
