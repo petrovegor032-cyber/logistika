@@ -746,105 +746,105 @@
     let messagesCache = {};      // { contactId: [messages] }
     let dialogsCache = [];       // кэш списка диалогов
     let contactsCache = {};      // { contactId: { name, avatar, login } }
-
-// ========== ИНИЦИАЛИЗАЦИЯ PUSH-УВЕДОМЛЕНИЙ ==========
-async function initPushNotifications() {
-    if (!('Notification' in window)) {
-        console.log('❌ Браузер не поддерживает уведомления');
-        return false;
-    }
     
-    if (!('serviceWorker' in navigator)) {
-        console.log('❌ Service Worker не поддерживается');
-        return false;
-    }
-    
-    try {
-        // Запрашиваем разрешение
-        const permission = await Notification.requestPermission();
-        if (permission !== 'granted') {
-            console.log('❌ Разрешение на уведомления не получено');
+    // ========== ИНИЦИАЛИЗАЦИЯ PUSH-УВЕДОМЛЕНИЙ ==========
+    async function initPushNotifications() {
+        if (!('Notification' in window)) {
+            console.log('❌ Браузер не поддерживает уведомления');
             return false;
         }
         
-        console.log('✅ Разрешение на уведомления получено');
+        if (!('serviceWorker' in navigator)) {
+            console.log('❌ Service Worker не поддерживается');
+            return false;
+        }
         
-        // Регистрируем Service Worker с правильным путем
-        let registration;
         try {
-            registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
-            console.log('✅ Service Worker зарегистрирован:', registration);
-        } catch (swError) {
-            console.log('⚠️ Ошибка регистрации SW, пробуем без указания пути:', swError);
-            registration = await navigator.serviceWorker.register('./firebase-messaging-sw.js');
-            console.log('✅ Service Worker зарегистрирован (альтернативный путь):', registration);
-        }
-        
-        // Ждём активации Service Worker
-        if (!registration.active) {
-            console.log('⏳ Ожидаем активации Service Worker...');
-            await new Promise((resolve) => {
-                const checkInterval = setInterval(() => {
-                    if (registration.active) {
-                        clearInterval(checkInterval);
-                        resolve();
-                    }
-                }, 100);
-                setTimeout(() => {
-                    clearInterval(checkInterval);
-                    resolve();
-                }, 5000);
-            });
-        }
-        
-        if (!registration.active) {
-            console.log('⚠️ Service Worker не активирован, но продолжим...');
-        } else {
-            console.log('✅ Service Worker активен');
-        }
-        
-        // ПРАВИЛЬНЫЙ VAPID КЛЮЧ (из консоли Firebase - Current pair)
-        const VAPID_KEY = "BE6NegQIKwFXc-Sv26u5VDnqfTzj-UvevRdoDPaTWMDLJ1kn_CJ-qzyPpPwlW2Hhv28dWHWzd69KJnTNVCylvVgBOKPupxrFLh6_ZgfQI8hHhiTwmVqjN2eUOUseATGadXmbwlXXp6m15HC2VtlRdNd6MZHawj-OlYfu6nBHAkGD5w";
-        
-        const messaging = firebase.messaging();
-        
-        // Получаем токен
-        let token;
-        try {
-            token = await messaging.getToken({ 
-                vapidKey: VAPID_KEY,
-                serviceWorkerRegistration: registration
-            });
-        } catch (tokenError) {
-            console.log('⚠️ Ошибка получения токена с registration, пробуем без:', tokenError);
-            token = await messaging.getToken({ vapidKey: VAPID_KEY });
-        }
-        
-        if (token) {
-            console.log('✅ FCM Token получен:', token);
-            
-            // Сохраняем токен в Firebase
-            if (currentUser && currentUser.id) {
-                const tokenKey = token.replace(/\./g, '_').replace(/:/g, '_');
-                await db.ref(`fcm_tokens/${currentUser.id}/${tokenKey}`).set({
-                    token: token,
-                    timestamp: Date.now(),
-                    userAgent: navigator.userAgent
-                });
-                console.log('✅ Токен сохранён в Firebase');
+            // Запрашиваем разрешение
+            const permission = await Notification.requestPermission();
+            if (permission !== 'granted') {
+                console.log('❌ Разрешение на уведомления не получено');
+                return false;
             }
             
-            return token;
-        } else {
-            console.log('❌ Не удалось получить FCM токен');
+            console.log('✅ Разрешение на уведомления получено');
+            
+            // Регистрируем Service Worker с правильным путем
+            let registration;
+            try {
+                registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+                console.log('✅ Service Worker зарегистрирован:', registration);
+            } catch (swError) {
+                console.log('⚠️ Ошибка регистрации SW, пробуем без указания пути:', swError);
+                registration = await navigator.serviceWorker.register('./firebase-messaging-sw.js');
+                console.log('✅ Service Worker зарегистрирован (альтернативный путь):', registration);
+            }
+            
+            // Ждём активации Service Worker
+            if (!registration.active) {
+                console.log('⏳ Ожидаем активации Service Worker...');
+                await new Promise((resolve) => {
+                    const checkInterval = setInterval(() => {
+                        if (registration.active) {
+                            clearInterval(checkInterval);
+                            resolve();
+                        }
+                    }, 100);
+                    setTimeout(() => {
+                        clearInterval(checkInterval);
+                        resolve();
+                    }, 5000);
+                });
+            }
+            
+            if (!registration.active) {
+                console.log('⚠️ Service Worker не активирован, но продолжим...');
+            } else {
+                console.log('✅ Service Worker активен');
+            }
+            
+            // ПРАВИЛЬНЫЙ VAPID КЛЮЧ (из консоли Firebase - Current pair)
+            const VAPID_KEY = "BE6NegQIKwFXc-Sv26u5VDnqfTzj-UvevRdoDPaTWMDLJ1kn_CJ-qzyPpPwlW2Hhv28dWHWzd69KJnTNVCylvVgBOKPupxrFLh6_ZgfQI8hHhiTwmVqjN2eUOUseATGadXmbwlXXp6m15HC2VtlRdNd6MZHawj-OlYfu6nBHAkGD5w";
+            
+            const messaging = firebase.messaging();
+            
+            // Получаем токен
+            let token;
+            try {
+                token = await messaging.getToken({ 
+                    vapidKey: VAPID_KEY,
+                    serviceWorkerRegistration: registration
+                });
+            } catch (tokenError) {
+                console.log('⚠️ Ошибка получения токена с registration, пробуем без:', tokenError);
+                token = await messaging.getToken({ vapidKey: VAPID_KEY });
+            }
+            
+            if (token) {
+                console.log('✅ FCM Token получен:', token);
+                
+                // Сохраняем токен в Firebase
+                if (currentUser && currentUser.id) {
+                    const tokenKey = token.replace(/\./g, '_').replace(/:/g, '_');
+                    await db.ref(`fcm_tokens/${currentUser.id}/${tokenKey}`).set({
+                        token: token,
+                        timestamp: Date.now(),
+                        userAgent: navigator.userAgent
+                    });
+                    console.log('✅ Токен сохранён в Firebase');
+                }
+                
+                return token;
+            } else {
+                console.log('❌ Не удалось получить FCM токен');
+                return null;
+            }
+            
+        } catch(e) {
+            console.error('❌ Ошибка инициализации уведомлений:', e);
             return null;
         }
-        
-    } catch(e) {
-        console.error('❌ Ошибка инициализации уведомлений:', e);
-        return null;
     }
-}
 
     // ========== ОТПРАВКА PUSH-УВЕДОМЛЕНИЙ ЧЕРЕЗ FCM ==========
     async function sendPushNotification(userId, title, body, link = null) {
