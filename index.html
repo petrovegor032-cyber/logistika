@@ -710,7 +710,9 @@
         authDomain: "audiozvonok-b340d.firebaseapp.com",
         databaseURL: "https://audiozvonok-b340d-default-rtdb.firebaseio.com",
         projectId: "audiozvonok-b340d",
-        storageBucket: "audiozvonok-b340d.firebasestorage.app"
+        storageBucket: "audiozvonok-b340d.firebasestorage.app",
+        messagingSenderId: "172196854367",
+        appId: "1:172196854367:web:116450d75c8377cae139ea"
     };
     
     firebase.initializeApp(firebaseConfig);
@@ -2603,7 +2605,6 @@
                 function getDataForHour(hour) {
                     let h = hour;
                     if (h < 6) h += 24;
-                    // Если h > 23, берём h-24 (следующий день)
                     if (h > 23) h = h - 24;
                     const temp = Math.round(hourlyTemp[h]);
                     let wind = Math.round(hourlyWind[h] * 0.5);
