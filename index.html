@@ -1199,7 +1199,13 @@
     async function createAd() {
         const text = document.getElementById('adText').value.trim();
         const price = document.getElementById('adPrice').value.trim();
-        const icon = document.getElementById('adIconInput')?.value.trim() || '📌';
+        let icon = document.getElementById('adIconInput')?.value.trim() || '📌';
+        
+        // Проверка: если не эмодзи (не начинается с символа эмодзи), то ставим 📌
+        const emojiRegex = /[\u{1F300}-\u{1F6FF}\u{1F900}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/u;
+        if (!emojiRegex.test(icon)) {
+            icon = '📌';
+        }
         
         if (!text) return showToast('Введите текст объявления');
         if (!userMarker) return showToast('Включите геолокацию');
@@ -1225,12 +1231,15 @@
         });
         
         showToast('Объявление опубликовано');
-        closeModal('addAdModal');
+        
+        // Очищаем форму
         document.getElementById('adText').value = '';
         document.getElementById('adPrice').value = '';
         document.getElementById('adPhoto').value = '';
-        if (adIconInput) adIconInput.value = '';
-        if (iconPreview) iconPreview.innerHTML = '';
+        const iconInput = document.getElementById('adIconInput');
+        if (iconInput) iconInput.value = '';
+        const preview = document.getElementById('iconPreview');
+        if (preview) preview.innerHTML = '';
         
         await loadAds();
         
@@ -1241,6 +1250,15 @@
         }
     }
 
+    function setIcon(icon) {
+        const input = document.getElementById('adIconInput');
+        if (input) {
+            input.value = icon;
+            const preview = document.getElementById('iconPreview');
+            if (preview) preview.innerHTML = icon;
+        }
+    }
+    
     // Предпросмотр иконки в модалке (с наблюдателем)
     function initIconPreview() {
         const adIconInput = document.getElementById('adIconInput');
@@ -1332,6 +1350,12 @@
             await db.ref(`ads/${adId}`).remove();
             await loadAds();
             showToast('Объявление удалено');
+            if (map) {
+                markers.forEach(m => map.removeLayer(m));
+                markers = [];
+                renderAds();
+            }
+            // Модалка НЕ закрывается
         }
     }
     
@@ -1370,7 +1394,7 @@
                     <div style="display:flex; flex-direction:column; gap:4px;">
                         ${ad.expiresAt > Date.now() && !ad.paused ? `<button onclick="extendAd('${ad.id}')" style="background:none; border:none; font-size:20px;">🕒</button>` : ''}
                         ${ad.expiresAt > Date.now() ? `<button onclick="pauseAd('${ad.id}', ${ad.paused})" style="background:none; border:none; font-size:20px;">${ad.paused ? '▶️' : '⏸'}</button>` : ''}
-                        <button onclick="deleteAd('${ad.id}'); closeModal('myAdsModal')" style="background:none; border:none; font-size:20px;">🗑️</button>
+                        <button onclick="deleteAd('${ad.id}')" style="background:none; border:none; font-size:20px;">🗑️</button>
                     </div>
                 </div>
                 ${ad.photoUrl ? `<img src="${ad.photoUrl}" style="max-width:100%; border-radius:12px; margin-top:8px;">` : ''}
