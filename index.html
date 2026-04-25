@@ -949,7 +949,8 @@
         
         const userId = Date.now().toString();
         await db.ref(`users/${userId}`).set({
-            login, password: btoa(password), name: login, avatar: '😎', created_at: Date.now(), online: true
+            login, password: btoa(password), name: login, avatar: '😎',
+            created_at: Date.now(), online: true, lastActive: Date.now()
         });
         
         currentUser = { id: userId, login, name: login, avatar: '😎' };
@@ -1001,6 +1002,7 @@
         currentUser = { id: userId, login, name: userData.name, avatar: userData.avatar || '😎', avatarBase64: userData.avatarBase64 || null };
         localStorage.setItem('user', JSON.stringify(currentUser));
         await db.ref(`users/${userId}/online`).set(true);
+        await db.ref(`users/${userId}/lastActive`).set(Date.now());
         closeModal('authModal');
         initMap();
         loadData();
@@ -1032,6 +1034,11 @@
         updateMenuAvatar();
         updateMenuLogin();
     }
+
+    async function updateLastActive() {
+        if (!currentUser) return;
+        await db.ref(`users/${currentUser.id}/lastActive`).set(Date.now());
+    }    
 
     document.getElementById('dialogsSearch')?.addEventListener('input', () => {
         const search = document.getElementById('dialogsSearch').value.toLowerCase();
