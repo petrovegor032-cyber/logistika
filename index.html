@@ -626,8 +626,20 @@
         <h3>📢 Новое объявление</h3>
         
         <div style="margin: 12px 0;">
-            <label style="display:block; margin-bottom:8px;">🎨 Иконка (любой эмодзи или текст)</label>
-            <input type="text" id="adIconInput" placeholder="🔍 Введите любой эмодзи, например 🚗 🏠 📦 🧑 ✈️" maxlength="4" style="font-size:32px; text-align:center; width:100%; padding:12px; border-radius:16px; background:rgba(255,255,255,0.1); color:white; border:1px solid rgba(255,255,255,0.2);">
+            <label style="display:block; margin-bottom:8px;">🎨 Иконка (выбери или введи эмодзи)</label>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px;" id="quickIcons">
+                <span style="font-size:32px; cursor:pointer; padding:8px; background:rgba(255,255,255,0.1); border-radius:12px;" onclick="setIcon('🚗')">🚗</span>
+                <span style="font-size:32px; cursor:pointer; padding:8px; background:rgba(255,255,255,0.1); border-radius:12px;" onclick="setIcon('🚚')">🚚</span>
+                <span style="font-size:32px; cursor:pointer; padding:8px; background:rgba(255,255,255,0.1); border-radius:12px;" onclick="setIcon('🏠')">🏠</span>
+                <span style="font-size:32px; cursor:pointer; padding:8px; background:rgba(255,255,255,0.1); border-radius:12px;" onclick="setIcon('📦')">📦</span>
+                <span style="font-size:32px; cursor:pointer; padding:8px; background:rgba(255,255,255,0.1); border-radius:12px;" onclick="setIcon('🧑')">🧑</span>
+                <span style="font-size:32px; cursor:pointer; padding:8px; background:rgba(255,255,255,0.1); border-radius:12px;" onclick="setIcon('🔧')">🔧</span>
+                <span style="font-size:32px; cursor:pointer; padding:8px; background:rgba(255,255,255,0.1); border-radius:12px;" onclick="setIcon('🛒')">🛒</span>
+                <span style="font-size:32px; cursor:pointer; padding:8px; background:rgba(255,255,255,0.1); border-radius:12px;" onclick="setIcon('✈️')">✈️</span>
+                <span style="font-size:32px; cursor:pointer; padding:8px; background:rgba(255,255,255,0.1); border-radius:12px;" onclick="setIcon('⚡')">⚡</span>
+                <span style="font-size:32px; cursor:pointer; padding:8px; background:rgba(255,255,255,0.1); border-radius:12px;" onclick="setIcon('📌')">📌</span>
+            </div>
+            <input type="text" id="adIconInput" placeholder="🔍 Или введи свой эмодзи" maxlength="2" style="font-size:32px; text-align:center; width:100%; padding:12px; border-radius:16px; background:rgba(255,255,255,0.1); color:white; border:1px solid rgba(255,255,255,0.2);">
             <div id="iconPreview" style="font-size:48px; text-align:center; margin-top:8px;"></div>
         </div>
         
