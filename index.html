@@ -2598,59 +2598,62 @@
                     return '🌡️';
                 }
                 
-                // Получаем температуру и иконку для указанного часа
                 function getTempAndIcon(hour) {
-                    const temp = Math.round(hourlyTemp[hour]);
-                    const code = hourlyCode[hour];
+                    let h = hour;
+                    if (h < 6) h += 24;
+                    const temp = Math.round(hourlyTemp[h]);
+                    const code = hourlyCode[h];
                     const sign = temp > 0 ? `+${temp}` : `${temp}`;
                     return { temp: sign, icon: getWeatherIcon(code) };
                 }
                 
-                // Определяем часы для каждого периода
-                // Утро: 6-11, берём час 9
-                // День: 12-17, берём час 14
-                // Вечер: 18-22, берём час 20
-                // Ночь: 23-5, берём час 1 (следующего дня)
-                let morningHour = 9;
-                let dayHour = 14;
-                let eveningHour = 20;
-                let nightHour = 1;
+                // Определяем порядок блоков в зависимости от текущего времени
+                let blocks = [];
                 
-                // Корректировка, если запрошенный час выходит за пределы массива
-                if (nightHour < 6 && nightHour <= currentHour) {
-                    nightHour += 24;
-                }
-                
-                const morning = getTempAndIcon(morningHour);
-                const day = getTempAndIcon(dayHour);
-                const evening = getTempAndIcon(eveningHour);
-                
-                let night;
-                if (nightHour <= 23) {
-                    night = getTempAndIcon(nightHour);
+                if (currentHour >= 23 || currentHour <= 5) {
+                    // Ночь сейчас
+                    blocks = [
+                        { period: 'night', label: '🌃', hour: currentHour },
+                        { period: 'morning', label: '🌅', hour: 9 },
+                        { period: 'day', label: '☀️', hour: 14 },
+                        { period: 'evening', label: '🌙', hour: 20 }
+                    ];
+                } else if (currentHour >= 6 && currentHour <= 11) {
+                    // Утро сейчас
+                    blocks = [
+                        { period: 'morning', label: '🌅', hour: currentHour },
+                        { period: 'day', label: '☀️', hour: 14 },
+                        { period: 'evening', label: '🌙', hour: 20 },
+                        { period: 'night', label: '🌃', hour: 1 }
+                    ];
+                } else if (currentHour >= 12 && currentHour <= 17) {
+                    // День сейчас
+                    blocks = [
+                        { period: 'day', label: '☀️', hour: currentHour },
+                        { period: 'evening', label: '🌙', hour: 20 },
+                        { period: 'night', label: '🌃', hour: 1 },
+                        { period: 'morning', label: '🌅', hour: 9 }
+                    ];
                 } else {
-                    night = getTempAndIcon(nightHour - 24);
+                    // Вечер сейчас
+                    blocks = [
+                        { period: 'evening', label: '🌙', hour: currentHour },
+                        { period: 'night', label: '🌃', hour: 1 },
+                        { period: 'morning', label: '🌅', hour: 9 },
+                        { period: 'day', label: '☀️', hour: 14 }
+                    ];
                 }
                 
                 const weatherStrip = document.getElementById('weatherStrip');
-                weatherStrip.innerHTML = `
-                    <div class="weather-block morning">
-                        <span class="weather-icon">${morning.icon}</span>
-                        <span class="weather-temp">${morning.temp}°</span>
-                    </div>
-                    <div class="weather-block day">
-                        <span class="weather-icon">${day.icon}</span>
-                        <span class="weather-temp">${day.temp}°</span>
-                    </div>
-                    <div class="weather-block evening">
-                        <span class="weather-icon">${evening.icon}</span>
-                        <span class="weather-temp">${evening.temp}°</span>
-                    </div>
-                    <div class="weather-block night">
-                        <span class="weather-icon">${night.icon}</span>
-                        <span class="weather-temp">${night.temp}°</span>
-                    </div>
-                `;
+                weatherStrip.innerHTML = blocks.map(block => {
+                    const weather = getTempAndIcon(block.hour);
+                    return `
+                        <div class="weather-block ${block.period}">
+                            <span class="weather-icon">${block.label}${weather.icon}</span>
+                            <span class="weather-temp">${weather.temp}°</span>
+                        </div>
+                    `;
+                }).join('');
                 
             } catch(e) {
                 console.log('Ошибка погоды:', e);
