@@ -1385,8 +1385,8 @@
         });
         
         showToast('✅ Объявление опубликовано');
+        updateLastActive();
         
-        // Очищаем форму
         document.getElementById('adText').value = '';
         document.getElementById('adPrice').value = '';
         document.getElementById('adPhoto').value = '';
@@ -1837,13 +1837,13 @@
             return;
         }
         
+        updateLastActive();
+        
         const contactId = currentChat.id;
         const container = document.getElementById('messages');
         
-        // Показываем из кэша если есть
         if (messagesCache[contactId]) {
             renderMessages(messagesCache[contactId]);
-            // Обновляем в фоне
             refreshMessages(contactId);
             return;
         }
@@ -1898,6 +1898,8 @@
     }
     
     async function sendMessage() {
+        updateLastActive();
+        
         const text = document.getElementById('messageInput').value.trim();
         if (!text || !currentChat || isBlocked(currentChat.id)) return;
         
@@ -1931,7 +1933,6 @@
             db.ref(`messages/${currentUser.id}/${currentChat.id}/${msgId}`).set(msgData)
         ]);
         
-        // Обновляем кэш сообщений
         if (messagesCache[currentChat.id]) {
             messagesCache[currentChat.id].push({ id: msgId, ...msgData });
             renderMessages(messagesCache[currentChat.id]);
@@ -1939,7 +1940,6 @@
             await loadMessages();
         }
         
-        // Обновляем кэш диалогов
         dialogsCache = [];
         await loadDialogs();
         
@@ -2044,6 +2044,8 @@
             return;
         }
         
+        updateLastActive();
+        
         const targetId = currentChat.id;
         const targetLogin = currentChat.login;
         const callId = Date.now().toString();
@@ -2066,7 +2068,6 @@
             timestamp: Date.now()
         });
         
-        // Отправляем уведомление о звонке
         if (typeof sendPushNotification === 'function') {
             await sendPushNotification(targetId, 'Входящий звонок', `${currentUser.name} звонит вам`);
         }
