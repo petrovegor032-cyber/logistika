@@ -760,7 +760,6 @@
         }
         
         try {
-            // Запрашиваем разрешение
             const permission = await Notification.requestPermission();
             if (permission !== 'granted') {
                 console.log('❌ Разрешение на уведомления не получено');
@@ -769,18 +768,15 @@
             
             console.log('✅ Разрешение на уведомления получено');
             
-            // Регистрируем Service Worker с правильным путем
             let registration;
             try {
                 registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
                 console.log('✅ Service Worker зарегистрирован:', registration);
             } catch (swError) {
-                console.log('⚠️ Ошибка регистрации SW, пробуем без указания пути:', swError);
                 registration = await navigator.serviceWorker.register('./firebase-messaging-sw.js');
                 console.log('✅ Service Worker зарегистрирован (альтернативный путь):', registration);
             }
             
-            // Ждём активации Service Worker
             if (!registration.active) {
                 console.log('⏳ Ожидаем активации Service Worker...');
                 await new Promise((resolve) => {
@@ -797,18 +793,10 @@
                 });
             }
             
-            if (!registration.active) {
-                console.log('⚠️ Service Worker не активирован, но продолжим...');
-            } else {
-                console.log('✅ Service Worker активен');
-            }
-            
-            // ПРАВИЛЬНЫЙ VAPID КЛЮЧ (из консоли Firebase - Current pair)
             const VAPID_KEY = "BE6NegQIKwFXc-Sv26u5VDnqfTzj-UvevRdoDPaTWMDLJ1kn_CJ-qzyPpPwlW2Hhv28dWHWzd69KJnTNVCylvVgBOKPupxrFLh6_ZgfQI8hHhiTwmVqjN2eUOUseATGadXmbwlXXp6m15HC2VtlRdNd6MZHawj-OlYfu6nBHAkGD5w";
             
             const messaging = firebase.messaging();
             
-            // Получаем токен
             let token;
             try {
                 token = await messaging.getToken({ 
@@ -816,14 +804,12 @@
                     serviceWorkerRegistration: registration
                 });
             } catch (tokenError) {
-                console.log('⚠️ Ошибка получения токена с registration, пробуем без:', tokenError);
                 token = await messaging.getToken({ vapidKey: VAPID_KEY });
             }
             
             if (token) {
                 console.log('✅ FCM Token получен:', token);
                 
-                // Сохраняем токен в Firebase
                 if (currentUser && currentUser.id) {
                     const tokenKey = token.replace(/\./g, '_').replace(/:/g, '_');
                     await db.ref(`fcm_tokens/${currentUser.id}/${tokenKey}`).set({
@@ -1089,6 +1075,7 @@
     }
     
     // ========== АВТОРИЗАЦИЯ ==========
+    // ========== РЕГИСТРАЦИЯ ==========
     async function register() {
         const login = document.getElementById('loginInput').value.trim();
         const password = document.getElementById('passwordInput').value.trim();
@@ -1130,7 +1117,24 @@
         }, { once: true });
         
         // Инициализация уведомлений
-        initPushNotifications();
+        await initPushNotifications();
+        
+        // ПЕРИОДИЧЕСКОЕ ОБНОВЛЕНИЕ ОНЛАЙН СТАТУСА И ТОКЕНА
+        if (currentUser && currentUser.id) {
+            setInterval(async () => {
+                if (currentUser) {
+                    await db.ref(`users/${currentUser.id}/online`).set(true);
+                    await db.ref(`users/${currentUser.id}/lastActive`).set(Date.now());
+                    
+                    // Обновляем токен каждые 24 часа
+                    const lastTokenRefresh = localStorage.getItem('lastTokenRefresh');
+                    if (!lastTokenRefresh || Date.now() - parseInt(lastTokenRefresh) > 24 * 60 * 60 * 1000) {
+                        await initPushNotifications();
+                        localStorage.setItem('lastTokenRefresh', Date.now().toString());
+                    }
+                }
+            }, 30000);
+        }
         
         // Обновляем аватар и логин в меню
         updateMenuAvatar();
@@ -1140,6 +1144,7 @@
         setTimeout(() => updateWeather(), 1000);
     }
     
+    // ========== ВХОД ==========
     async function login() {
         const login = document.getElementById('loginInput').value.trim();
         const password = document.getElementById('passwordInput').value.trim();
@@ -1181,7 +1186,24 @@
         }, { once: true });
         
         // Инициализация уведомлений
-        initPushNotifications();
+        await initPushNotifications();
+        
+        // ПЕРИОДИЧЕСКОЕ ОБНОВЛЕНИЕ ОНЛАЙН СТАТУСА И ТОКЕНА
+        if (currentUser && currentUser.id) {
+            setInterval(async () => {
+                if (currentUser) {
+                    await db.ref(`users/${currentUser.id}/online`).set(true);
+                    await db.ref(`users/${currentUser.id}/lastActive`).set(Date.now());
+                    
+                    // Обновляем токен каждые 24 часа
+                    const lastTokenRefresh = localStorage.getItem('lastTokenRefresh');
+                    if (!lastTokenRefresh || Date.now() - parseInt(lastTokenRefresh) > 24 * 60 * 60 * 1000) {
+                        await initPushNotifications();
+                        localStorage.setItem('lastTokenRefresh', Date.now().toString());
+                    }
+                }
+            }, 30000);
+        }
         
         // Обновляем аватар и логин в меню
         updateMenuAvatar();
@@ -1935,6 +1957,7 @@
     }
         
     // ========== ЧАТЫ ==========
+    // ========== НАСТРОЙКА СЛУШАТЕЛЯ СООБЩЕНИЙ ==========
     function setupMessageListener() {
         if (!currentUser) return;
         
@@ -1952,17 +1975,18 @@
                 const contactName = contact?.name || 'Пользователь';
                 
                 showToast(`📨 Новое сообщение от ${contactName}`);
+                
+                // ОТПРАВКА PUSH УВЕДОМЛЕНИЯ
+                if (typeof sendPushNotification === 'function') {
+                    await sendPushNotification(contactId, '💬 Новое сообщение', `${contactName}: ${lastMsg.content?.substring(0, 100) || '📎 Файл'}`);
+                }
+                
                 try {
                     const notifSound = new Audio();
                     notifSound.src = "https://www.soundjay.com/misc/sounds/notification-01.mp3";
                     notifSound.volume = 0.3;
                     notifSound.play();
                 } catch(e) {}
-                
-                // Отправляем push-уведомление
-                if (typeof sendPushNotification === 'function') {
-                    await sendPushNotification(contactId, 'Новое сообщение', lastMsg.content?.substring(0, 100) || 'Файл');
-                }
             }
             
             if (currentChat && contactId === currentChat.id && !isBlocked(contactId)) {
@@ -2817,6 +2841,41 @@
     
     initSparks();
     checkAuth();
+
+    // ========== ТЕСТОВАЯ ФУНКЦИЯ ДЛЯ ОТЛАДКИ (ДОБАВИТЬ В КОНЕЦ) ==========
+    window.testPushNotification = async function() {
+        if (!currentUser) {
+            alert('Сначала войдите в аккаунт');
+            return;
+        }
+        
+        console.log('🧪 Тестирование push-уведомлений...');
+        console.log('1. Проверка Service Worker...');
+        
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        console.log('Service Worker регистрации:', registrations);
+        
+        console.log('2. Статус разрешения:', Notification.permission);
+        
+        if (Notification.permission !== 'granted') {
+            const permission = await Notification.requestPermission();
+            console.log('Новое разрешение:', permission);
+        }
+        
+        console.log('3. Получение FCM токена...');
+        const token = await initPushNotifications();
+        
+        if (token) {
+            console.log('✅ Токен получен:', token);
+            alert(`✅ Push уведомления работают!\n\nТокен: ${token.substring(0, 30)}...\n\nДля отправки тестового уведомления себе, выполните в консоли:\nsendPushNotification("${currentUser.id}", "Тест", "Это тестовое уведомление")`);
+        } else {
+            console.log('❌ Не удалось получить токен');
+            alert('❌ Ошибка получения токена. Проверьте:\n1. HTTPS соединение\n2. Service Worker\n3. VAPID ключ');
+        }
+    };
+    
+    console.log('🔥 Для теста push-уведомлений выполните: testPushNotification()');
+    
 </script>
 </body>
 </html>
