@@ -492,18 +492,19 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            padding: 6px 12px;
-            border-radius: 24px;
-            min-width: 75px;
+            padding: 4px 6px;
+            border-radius: 20px;
+            min-width: 60px;
             font-weight: bold;
+            flex-shrink: 0;
         }
         .weather-block.morning { background: linear-gradient(135deg, #ff9800, #ffc107); color: #333; }
         .weather-block.day { background: linear-gradient(135deg, #2196f3, #03a9f4); color: white; }
         .weather-block.evening { background: linear-gradient(135deg, #9c27b0, #e91e63); color: white; }
         .weather-block.night { background: linear-gradient(135deg, #1a237e, #283593); color: white; }
-        .weather-temp { font-size: 16px; font-weight: bold; }
-        .weather-icon { font-size: 20px; }
-        .weather-wind { font-size: 11px; opacity: 0.8; margin-top: 2px; }
+        .weather-temp { font-size: 14px; font-weight: bold; }
+        .weather-icon { font-size: 16px; }
+        .weather-wind { font-size: 10px; opacity: 0.8; margin-top: 2px; }
         
     </style>
 </head>
@@ -513,8 +514,8 @@
 
 <div class="header">
     <button class="menu-btn" onclick="toggleMenu()">☰</button>
-    <div id="weatherStrip" style="display: flex; gap: 8px; overflow-x: auto; flex: 1; justify-content: center;">
-        <!-- Блоки погоды будут добавлены через JS -->
+    <div id="weatherStrip" style="display: flex; gap: 4px; overflow-x: auto; flex: 1;">
+        <!-- Блоки погоды -->
     </div>
 </div>
 
