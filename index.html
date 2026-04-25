@@ -751,12 +751,17 @@
         
         try {
             const messaging = firebase.messaging();
+            
+            // Регистрируем Service Worker с правильным путём
+            const registration = await navigator.serviceWorker.register('/logistika/firebase-messaging-sw.js');
+            console.log('Service Worker зарегистрирован:', registration);
+            
             const token = await messaging.getToken({ 
-                vapidKey: "BOKPupxrFLh6_ZgfQl8hHhiTwmVqjN2eUOUseATGadXMbwlXXp6m15HC2VtIRdNd6MZHawj-0IYfu6nBHAkGD5w"
+                vapidKey: "BOKPupxrFLh6_ZgfQl8hHhiTwmVqjN2eUOUseATGadXMbwlXXp6m15HC2VtIRdNd6MZHawj-0IYfu6nBHAkGD5w",
+                serviceWorkerRegistration: registration
             });
             console.log('FCM Token:', token);
             
-            // Сохраняем токен в БД
             await db.ref(`fcm_tokens/${currentUser.id}/${token.replace(/\./g, '_')}`).set({
                 token: token,
                 timestamp: Date.now()
