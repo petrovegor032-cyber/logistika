@@ -2604,7 +2604,8 @@
                     let h = hour;
                     if (h < 6) h += 24;
                     const temp = Math.round(hourlyTemp[h]);
-                    const wind = Math.round(hourlyWind[h]);
+                    let wind = Math.round(hourlyWind[h] * 0.5);
+                    if (wind < 1) wind = 1;
                     const code = hourlyCode[h];
                     const sign = temp > 0 ? `+${temp}` : `${temp}`;
                     return { temp: sign, wind: wind, icon: getWeatherIcon(code) };
