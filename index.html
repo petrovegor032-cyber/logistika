@@ -504,6 +504,24 @@
         .weather-block.night { background: linear-gradient(135deg, #1a237e, #283593); color: white; }
         .weather-temp { font-size: 16px; font-weight: bold; }
         .weather-icon { font-size: 18px; }
+
+        .weather-block {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 6px 12px;
+            border-radius: 24px;
+            min-width: 75px;
+            font-weight: bold;
+        }
+        .weather-block.morning { background: linear-gradient(135deg, #ff9800, #ffc107); color: #333; }
+        .weather-block.day { background: linear-gradient(135deg, #2196f3, #03a9f4); color: white; }
+        .weather-block.evening { background: linear-gradient(135deg, #9c27b0, #e91e63); color: white; }
+        .weather-block.night { background: linear-gradient(135deg, #1a237e, #283593); color: white; }
+        .weather-temp { font-size: 16px; font-weight: bold; }
+        .weather-icon { font-size: 20px; }
+        .weather-wind { font-size: 11px; opacity: 0.8; margin-top: 2px; }
         
     </style>
 </head>
@@ -2578,7 +2596,7 @@
             const lon = pos.coords.longitude;
             
             try {
-                const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m,weathercode&timezone=auto`;
+                const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m,weathercode,windspeed_10m&timezone=auto`;
                 const res = await fetch(url);
                 const data = await res.json();
                 
@@ -2586,6 +2604,7 @@
                 const currentHour = now.getHours();
                 const hourlyTemp = data.hourly.temperature_2m;
                 const hourlyCode = data.hourly.weathercode;
+                const hourlyWind = data.hourly.windspeed_10m;
                 
                 function getWeatherIcon(code) {
                     if (code === 0 || code === 1) return '☀️';
@@ -2598,59 +2617,59 @@
                     return '🌡️';
                 }
                 
-                function getTempAndIcon(hour) {
+                function getDataForHour(hour) {
                     let h = hour;
                     if (h < 6) h += 24;
                     const temp = Math.round(hourlyTemp[h]);
+                    const wind = Math.round(hourlyWind[h]);
                     const code = hourlyCode[h];
                     const sign = temp > 0 ? `+${temp}` : `${temp}`;
-                    return { temp: sign, icon: getWeatherIcon(code) };
+                    return { temp: sign, wind: wind, icon: getWeatherIcon(code) };
                 }
                 
-                // Определяем порядок блоков в зависимости от текущего времени
+                // Определяем порядок блоков
                 let blocks = [];
                 
                 if (currentHour >= 23 || currentHour <= 5) {
-                    // Ночь сейчас
                     blocks = [
-                        { period: 'night', label: '🌃', hour: currentHour },
-                        { period: 'morning', label: '🌅', hour: 9 },
-                        { period: 'day', label: '☀️', hour: 14 },
-                        { period: 'evening', label: '🌙', hour: 20 }
+                        { period: 'night', hour: currentHour },
+                        { period: 'morning', hour: 9 },
+                        { period: 'day', hour: 14 },
+                        { period: 'evening', hour: 20 }
                     ];
                 } else if (currentHour >= 6 && currentHour <= 11) {
-                    // Утро сейчас
                     blocks = [
-                        { period: 'morning', label: '🌅', hour: currentHour },
-                        { period: 'day', label: '☀️', hour: 14 },
-                        { period: 'evening', label: '🌙', hour: 20 },
-                        { period: 'night', label: '🌃', hour: 1 }
+                        { period: 'morning', hour: currentHour },
+                        { period: 'day', hour: 14 },
+                        { period: 'evening', hour: 20 },
+                        { period: 'night', hour: 1 }
                     ];
                 } else if (currentHour >= 12 && currentHour <= 17) {
-                    // День сейчас
                     blocks = [
-                        { period: 'day', label: '☀️', hour: currentHour },
-                        { period: 'evening', label: '🌙', hour: 20 },
-                        { period: 'night', label: '🌃', hour: 1 },
-                        { period: 'morning', label: '🌅', hour: 9 }
+                        { period: 'day', hour: currentHour },
+                        { period: 'evening', hour: 20 },
+                        { period: 'night', hour: 1 },
+                        { period: 'morning', hour: 9 }
                     ];
                 } else {
-                    // Вечер сейчас
                     blocks = [
-                        { period: 'evening', label: '🌙', hour: currentHour },
-                        { period: 'night', label: '🌃', hour: 1 },
-                        { period: 'morning', label: '🌅', hour: 9 },
-                        { period: 'day', label: '☀️', hour: 14 }
+                        { period: 'evening', hour: currentHour },
+                        { period: 'night', hour: 1 },
+                        { period: 'morning', hour: 9 },
+                        { period: 'day', hour: 14 }
                     ];
                 }
                 
                 const weatherStrip = document.getElementById('weatherStrip');
                 weatherStrip.innerHTML = blocks.map(block => {
-                    const weather = getTempAndIcon(block.hour);
+                    const data = getDataForHour(block.hour);
                     return `
                         <div class="weather-block ${block.period}">
-                            <span class="weather-icon">${block.label}${weather.icon}</span>
-                            <span class="weather-temp">${weather.temp}°</span>
+                            <div>
+                                <span class="weather-icon">${data.icon}</span>
+                                <span class="weather-temp">${data.temp}°</span>
+                            </div>
+                            <div class="weather-wind">💨 ${data.wind} км/ч</div>
                         </div>
                     `;
                 }).join('');
