@@ -514,18 +514,22 @@
 </div>
 
 <div id="chatContainer" class="chat-container">
-    <div class="chat-header">
-        <button class="btn-icon" onclick="closeChat()" style="background:none;">←</button>
-        <div style="flex:1">
-            <div id="chatName" style="font-weight:bold"></div>
-            <div id="chatLogin" style="font-size:11px"></div>
-        </div>
-        <div id="callStatus" style="font-size:11px; opacity:0.7; margin:0 8px;"></div>
-        <button class="btn-icon" id="blockUserBtn" onclick="toggleBlockUser()">🚫</button>
-        <button class="btn-icon" id="deleteChatBtn" onclick="deleteChat()">🗑️</button>
-        <button class="btn-icon" id="callBtn" onclick="startCall()">📞</button>
-        <button class="btn-icon btn-danger" id="endCallBtn" onclick="endCall()" style="display: none;">🔴</button>
+<div class="chat-header">
+    <button class="btn-icon" onclick="closeChat()" style="background:none;">←</button>
+    <div class="chat-avatar" style="width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:24px; overflow:hidden;">
+        👤
     </div>
+    <div style="flex:1">
+        <div id="chatName" style="font-weight:bold"></div>
+        <div id="chatLogin" style="font-size:11px"></div>
+    </div>
+    <div id="callStatus" style="font-size:11px; opacity:0.7; margin:0 8px;"></div>
+    <button class="btn-icon" id="blockUserBtn" onclick="toggleBlockUser()">🚫</button>
+    <button class="btn-icon" id="deleteChatBtn" onclick="deleteChat()">🗑️</button>
+    <button class="btn-icon" id="callBtn" onclick="startCall()">📞</button>
+    <button class="btn-icon btn-danger" id="endCallBtn" onclick="endCall()" style="display: none;">🔴</button>
+</div>
+    
     <div class="messages" id="messages"></div>
     <div class="bottom-panel">
         <button class="btn-icon" onclick="selectFile()">📎</button>
@@ -1173,7 +1177,10 @@
         
         document.getElementById('dialogsList').innerHTML = filtered.map(d => `
             <div class="contact-item" onclick='openChat(${JSON.stringify(d).replace(/"/g, '&quot;')})'>
-                <div class="contact-avatar">${d.avatar}<span class="online-indicator" style="background: ${d.online ? '#4caf50' : '#888'}"></span></div>
+                <div class="contact-avatar" style="overflow:hidden;">
+                    ${d.avatarBase64 ? `<img src="${d.avatarBase64}" style="width:100%; height:100%; object-fit:cover;">` : d.avatar || '👤'}
+                    <span class="online-indicator" style="background: ${d.online ? '#4caf50' : '#888'}"></span>
+                </div>
                 <div style="flex:1">
                     <b>${escapeHtml(d.name)}</b><br>
                     <small>@${d.login}</small>
@@ -1626,21 +1633,39 @@
         }
     }
     
-    async function openChatFromAd(userId) {
-        const userSnap = await db.ref(`users/${userId}`).once('value');
-        const userData = userSnap.val();
-        if (!userData) return showToast('Пользователь не найден');
-        
-        const contact = { id: userId, login: userData.login, name: userData.name, avatar: userData.avatar || '👤' };
-        
-        const contactExists = await db.ref(`contacts/${currentUser.id}/${userId}`).once('value');
-        if (!contactExists.exists()) {
-            await db.ref(`contacts/${currentUser.id}/${userId}`).set({ name: userData.name, login: userData.login, added_at: Date.now() });
-            await loadDialogs();
+    function openChat(contact) {
+        if (!contact) return;
+        if (isBlocked(contact.id)) {
+            showToast(`🔒 ${contact.name} заблокирован`);
+            return;
         }
         
-        switchPage('dialogs');
-        openChat(contact);
+        currentChat = contact;
+        document.getElementById('chatName').innerText = contact.name;
+        document.getElementById('chatLogin').innerText = '@' + contact.login;
+        
+        // Обновляем аватар в шапке чата
+        const chatAvatar = document.querySelector('.chat-header .chat-avatar');
+        if (chatAvatar) {
+            if (contact.avatarBase64) {
+                chatAvatar.innerHTML = `<img src="${contact.avatarBase64}" style="width:100%; height:100%; border-radius:50%; object-fit:cover;">`;
+            } else {
+                chatAvatar.innerHTML = contact.avatar || '👤';
+            }
+        }
+        
+        const isBlockedUser = blockedUsers.includes(contact.id);
+        document.getElementById('blockUserBtn').style.background = isBlockedUser ? '#dc3545' : 'linear-gradient(135deg, #667eea, #764ba2)';
+        
+        document.getElementById('chatContainer').classList.add('active');
+        
+        if (window.chatListenerRef) window.chatListenerRef.off();
+        window.chatListenerRef = db.ref(`messages/${currentUser.id}/${contact.id}`);
+        window.chatListenerRef.on('child_added', () => {
+            if (!isBlocked(contact.id)) loadMessages();
+        });
+        
+        loadMessages();
     }
     
     // ========== КОНТАКТЫ - ИСПРАВЛЕННАЯ ВЕРСИЯ ДЛЯ ТЕЛЕФОНА ==========
@@ -2111,6 +2136,40 @@
             }
         });
     }
+
+    // Слушаем изменения пользователей (аватары, имена)
+    function setupUsersListener() {
+        db.ref('users').on('child_changed', (snap) => {
+            const userId = snap.key;
+            const userData = snap.val();
+            
+            // Обновляем кэш
+            contactsCache[userId] = userData;
+            
+            // Обновляем список диалогов
+            const dialogIndex = dialogsCache.findIndex(d => d.id === userId);
+            if (dialogIndex !== -1) {
+                dialogsCache[dialogIndex].name = userData.name;
+                dialogsCache[dialogIndex].avatar = userData.avatar;
+                dialogsCache[dialogIndex].avatarBase64 = userData.avatarBase64;
+                dialogsCache[dialogIndex].online = userData.online;
+                renderDialogs(dialogsCache);
+            }
+            
+            // Обновляем шапку чата если открыт
+            if (currentChat && currentChat.id === userId) {
+                const chatAvatar = document.querySelector('.chat-header .chat-avatar');
+                if (chatAvatar) {
+                    if (userData.avatarBase64) {
+                        chatAvatar.innerHTML = `<img src="${userData.avatarBase64}" style="width:100%; height:100%; border-radius:50%; object-fit:cover;">`;
+                    } else {
+                        chatAvatar.innerHTML = userData.avatar || '👤';
+                    }
+                }
+                document.getElementById('chatName').innerText = userData.name || userData.login;
+            }
+        });
+    }
     
     function showIncomingCall(callId, fromId, fromLogin) {
         vibrate();
@@ -2488,9 +2547,10 @@
     async function loadData() {
         if (!currentUser) return;
         await loadBlockedUsers();
-        await loadDialogs();  // было loadContacts()
+        await loadDialogs();
         await loadAds();
         setupCallListener();
+        setupUsersListener();
         db.ref(`users/${currentUser.id}/online`).set(true);
         setInterval(() => {
             if (currentUser) db.ref(`users/${currentUser.id}/online`).set(true);
