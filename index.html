@@ -624,28 +624,13 @@
     <div class="modal-content">
         <span class="modal-close" onclick="closeModal('addAdModal')">✕</span>
         <h3>📢 Новое объявление</h3>
-        <div class="icon-selector" id="iconSelector">
-            <div class="icon-option" onclick="selectAdIcon('🚗')">🚗</div>
-            <div class="icon-option" onclick="selectAdIcon('🚚')">🚚</div>
-            <div class="icon-option" onclick="selectAdIcon('👍')">👍</div>
-            <div class="icon-option" onclick="selectAdIcon('🤝')">🤝</div>
-            <div class="icon-option" onclick="selectAdIcon('🚑')">🚑</div>
-            <div class="icon-option" onclick="selectAdIcon('🚨')">🚨</div>
-            <div class="icon-option" onclick="selectAdIcon('✈️')">✈️</div>
-            <div class="icon-option" onclick="selectAdIcon('🚢')">🚢</div>
-            <div class="icon-option" onclick="selectAdIcon('🚂')">🚂</div>
-            <div class="icon-option" onclick="selectAdIcon('🏍️')">🏍️</div>
-            <div class="icon-option" onclick="selectAdIcon('🚲')">🚲</div>
-            <div class="icon-option" onclick="selectAdIcon('🐎')">🐎</div>
-            <div class="icon-option" onclick="selectAdIcon('⛽')">⛽</div>
-            <div class="icon-option" onclick="selectAdIcon('🔧')">🔧</div>
-            <div class="icon-option" onclick="selectAdIcon('🛞')">🛞</div>
-            <div class="icon-option" onclick="selectAdIcon('🛒')">🛒</div>
-            <div class="icon-option" onclick="selectAdIcon('🏠')">🏠</div>
-            <div class="icon-option" onclick="selectAdIcon('💼')">💼</div>
-            <div class="icon-option" onclick="selectAdIcon('⚡')">⚡</div>
-            <div class="icon-option" onclick="selectAdIcon('📌')">📌</div>
+        
+        <div style="margin: 12px 0;">
+            <label style="display:block; margin-bottom:8px;">🎨 Иконка (любой эмодзи или текст)</label>
+            <input type="text" id="adIconInput" placeholder="🔍 Введите любой эмодзи, например 🚗 🏠 📦 🧑 ✈️" maxlength="4" style="font-size:32px; text-align:center; width:100%; padding:12px; border-radius:16px; background:rgba(255,255,255,0.1); color:white; border:1px solid rgba(255,255,255,0.2);">
+            <div id="iconPreview" style="font-size:48px; text-align:center; margin-top:8px;"></div>
         </div>
+        
         <textarea id="adText" rows="3" placeholder="Текст объявления..."></textarea>
         <input type="text" id="adPrice" placeholder="Цена (опционально)">
         <input type="file" id="adPhoto" accept="image/*">
@@ -689,7 +674,6 @@
     let markers = [];
     let allAds = [];
     let userMarker = null;
-    let selectedAdIcon = '📌';
     let mediaRecorder = null;
     let blockedUsers = [];
     
@@ -1199,16 +1183,12 @@
         }
     }
     
-    // ========== ОБЪЯВЛЕНИЯ ==========
-    function selectAdIcon(icon) {
-        selectedAdIcon = icon;
-        document.querySelectorAll('.icon-option').forEach(opt => opt.classList.remove('selected'));
-        if (event && event.target) event.target.classList.add('selected');
-    }
-    
+    // ========== ОБЪЯВЛЕНИЯ ==========   
     async function createAd() {
         const text = document.getElementById('adText').value.trim();
         const price = document.getElementById('adPrice').value.trim();
+        const icon = document.getElementById('adIconInput')?.value.trim() || '📌';
+        
         if (!text) return showToast('Введите текст объявления');
         if (!userMarker) return showToast('Включите геолокацию');
         
@@ -1224,11 +1204,11 @@
         }
         
         await db.ref(`ads/${Date.now()}`).set({
-            icon: selectedAdIcon, text, price, photoUrl,
+            icon: icon, text, price, photoUrl,
             lat: pos.lat, lng: pos.lng,
             userId: currentUser.id, userLogin: currentUser.login,
             timestamp: Date.now(),
-            expiresAt: Date.now() + 24 * 60 * 60 * 1000,  // +24 часа
+            expiresAt: Date.now() + 24 * 60 * 60 * 1000,
             paused: false
         });
         
@@ -1237,6 +1217,8 @@
         document.getElementById('adText').value = '';
         document.getElementById('adPrice').value = '';
         document.getElementById('adPhoto').value = '';
+        if (adIconInput) adIconInput.value = '';
+        if (iconPreview) iconPreview.innerHTML = '';
         
         await loadAds();
         
@@ -1246,6 +1228,21 @@
             renderAds();
         }
     }
+
+    // Предпросмотр иконки в модалке (с наблюдателем)
+    function initIconPreview() {
+        const adIconInput = document.getElementById('adIconInput');
+        const iconPreview = document.getElementById('iconPreview');
+        if (adIconInput && iconPreview) {
+            adIconInput.addEventListener('input', (e) => {
+                const val = e.target.value.trim();
+                iconPreview.innerHTML = val || '📌';
+            });
+        } else {
+            setTimeout(initIconPreview, 500);
+        }
+    }
+    initIconPreview();
     
     async function loadAds() {
         const snapshot = await db.ref('ads').once('value');
