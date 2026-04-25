@@ -1069,7 +1069,7 @@
         await db.ref(`messages/${currentUser.id}/${currentChat.id}`).remove();
         showToast('Чат удалён');
         closeChat();
-        loadChats();
+        loadDialogs();
     }
     
     // ========== ПРОФИЛЬ ==========
