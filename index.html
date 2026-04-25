@@ -476,6 +476,16 @@
             background: rgba(0,0,0,0.5);
             display: inline-block;
         }        
+
+        /* Убираем квадратный фон у маркеров-эмодзи */
+        .custom-marker {
+            background: transparent !important;
+            border: none !important;
+        }
+        .custom-marker div {
+            background: transparent !important;
+            border: none !important;
+        }        
     </style>
 </head>
 <body>
@@ -1288,9 +1298,16 @@
             markers.forEach(m => map.removeLayer(m));
             markers = [];
             filtered.forEach(ad => {
+                // СОЗДАЕМ МАРКЕР С ПРОЗРАЧНЫМ ФОНОМ И БЕЗ КВАДРАТА
                 const marker = L.marker([ad.lat, ad.lng], {
-                    icon: L.divIcon({ html: `<div style="font-size:32px;">${ad.icon || '📌'}</div>`, iconSize: [35, 35] })
+                    icon: L.divIcon({
+                        html: `<div style="font-size:32px; line-height:1; text-shadow: 1px 1px 2px rgba(0,0,0,0.3);">${ad.icon || '📌'}</div>`,
+                        className: 'custom-marker',
+                        iconSize: [35, 35],
+                        popupAnchor: [0, -15]
+                    })
                 }).addTo(map);
+                
                 marker.bindPopup(`
                     <b>${escapeHtml(ad.text)}</b><br>
                     ${ad.price ? `💰 ${ad.price}₽<br>` : ''}
