@@ -1201,7 +1201,6 @@
         const price = document.getElementById('adPrice').value.trim();
         let icon = document.getElementById('adIconInput')?.value.trim() || '📌';
         
-        // Проверка: если не эмодзи (не начинается с символа эмодзи), то ставим 📌
         const emojiRegex = /[\u{1F300}-\u{1F6FF}\u{1F900}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/u;
         if (!emojiRegex.test(icon)) {
             icon = '📌';
@@ -1243,11 +1242,21 @@
         
         await loadAds();
         
+        // Если модалка "Мои объявления" открыта - обновляем её содержимое
+        const myAdsModal = document.getElementById('myAdsModal');
+        if (myAdsModal && myAdsModal.classList.contains('active')) {
+            await showMyAds();
+        }
+        
+        // Обновляем карту
         if (map) {
             markers.forEach(m => map.removeLayer(m));
             markers = [];
             renderAds();
         }
+        
+        // Закрываем модалку создания объявления
+        closeModal('addAdModal');
     }
 
     function setIcon(icon) {
@@ -1350,12 +1359,19 @@
             await db.ref(`ads/${adId}`).remove();
             await loadAds();
             showToast('Объявление удалено');
+            
+            // Обновляем карту
             if (map) {
                 markers.forEach(m => map.removeLayer(m));
                 markers = [];
                 renderAds();
             }
-            // Модалка НЕ закрывается
+            
+            // Если модалка "Мои объявления" открыта - обновляем её содержимое
+            const myAdsModal = document.getElementById('myAdsModal');
+            if (myAdsModal && myAdsModal.classList.contains('active')) {
+                await showMyAds();
+            }
         }
     }
     
@@ -1367,10 +1383,10 @@
     }
     
     async function showMyAds() {
+        // Загружаем свежие данные
         await loadAds();
-        const myAds = allAds.filter(ad => ad.userId === currentUser.id);
         
-        // Также показываем объявления на паузе и истекшие, но с пометкой
+        // Получаем все объявления пользователя (включая на паузе и истекшие)
         const snapshot = await db.ref('ads').once('value');
         const allMyAds = [];
         snapshot.forEach(child => {
@@ -1378,6 +1394,15 @@
             if (ad.userId === currentUser.id) {
                 allMyAds.push({ id: child.key, ...ad });
             }
+        });
+        
+        // Сортируем: сначала активные, потом на паузе, потом истекшие
+        allMyAds.sort((a, b) => {
+            const aActive = !a.paused && a.expiresAt > Date.now();
+            const bActive = !b.paused && b.expiresAt > Date.now();
+            if (aActive && !bActive) return -1;
+            if (!aActive && bActive) return 1;
+            return b.timestamp - a.timestamp;
         });
         
         document.getElementById('myAdsList').innerHTML = allMyAds.map(ad => `
@@ -1401,7 +1426,11 @@
             </div>
         `).join('');
         
-        if (allMyAds.length === 0) document.getElementById('myAdsList').innerHTML = '<div style="text-align:center">📭 Нет объявлений</div>';
+        if (allMyAds.length === 0) {
+            document.getElementById('myAdsList').innerHTML = '<div style="text-align:center">📭 Нет объявлений</div>';
+        }
+        
+        // Открываем модалку (если она ещё не открыта)
         openModal('myAdsModal');
     }
 
@@ -1410,8 +1439,20 @@
             expiresAt: Date.now() + 24 * 60 * 60 * 1000
         });
         showToast('🕒 Объявление продлено на 24 часа');
-        await showMyAds();
         await loadAds();
+        
+        // Обновляем карту
+        if (map) {
+            markers.forEach(m => map.removeLayer(m));
+            markers = [];
+            renderAds();
+        }
+        
+        // Обновляем модалку "Мои объявления", если открыта
+        const myAdsModal = document.getElementById('myAdsModal');
+        if (myAdsModal && myAdsModal.classList.contains('active')) {
+            await showMyAds();
+        }
     }
     
     async function pauseAd(adId, currentlyPaused) {
@@ -1419,12 +1460,17 @@
             paused: !currentlyPaused
         });
         showToast(currentlyPaused ? '▶️ Объявление активировано' : '⏸ Объявление на паузе');
-        await showMyAds();
         await loadAds();
         
         if (map) {
             markers.forEach(m => map.removeLayer(m));
             renderAds();
+        }
+        
+        // Обновляем модалку "Мои объявления", если открыта
+        const myAdsModal = document.getElementById('myAdsModal');
+        if (myAdsModal && myAdsModal.classList.contains('active')) {
+            await showMyAds();
         }
     }
     
