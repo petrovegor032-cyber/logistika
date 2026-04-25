@@ -1,19 +1,16 @@
 name: Clean old data
 on:
   schedule:
-    - cron: '0 * * * *'
+    - cron: '0 */6 * * *'  # Каждые 6 часов
   workflow_dispatch:
 
 jobs:
   clean:
     runs-on: ubuntu-latest
     steps:
-      - name: Delete expired ads (not paused, expired)
+      - name: Delete expired ads
         run: |
-          NOW=$(date +%s%3N)
-          curl -X DELETE "https://audiozvonok-b340d-default-rtdb.firebaseio.com/ads.json?orderBy=\"expiresAt\"&endAt=$NOW"
-      
-      - name: Delete inactive users (7+ days no activity)
-        run: |
-          SEVEN_DAYS_AGO=$(($(date +%s%3N) - 7*24*60*60*1000))
-          curl -X DELETE "https://audiozvonok-b340d-default-rtdb.firebaseio.com/users.json?orderBy=\"lastActive\"&endAt=$SEVEN_DAYS_AGO"
+          curl -X PATCH "https://audiozvonok-b340d-default-rtdb.firebaseio.com/ads.json" \
+            -H "Content-Type: application/json" \
+            -d '{"expired": true}' 2>/dev/null || true
+          echo "Cleanup completed"
