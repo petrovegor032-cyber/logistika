@@ -485,7 +485,26 @@
         .custom-marker div {
             background: transparent !important;
             border: none !important;
-        }        
+        }   
+
+        .weather-block {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 4px 10px;
+            border-radius: 30px;
+            min-width: 65px;
+            font-weight: bold;
+            font-size: 14px;
+        }
+        .weather-block.morning { background: linear-gradient(135deg, #ff9800, #ffc107); color: #333; }
+        .weather-block.day { background: linear-gradient(135deg, #2196f3, #03a9f4); color: white; }
+        .weather-block.evening { background: linear-gradient(135deg, #9c27b0, #e91e63); color: white; }
+        .weather-block.night { background: linear-gradient(135deg, #1a237e, #283593); color: white; }
+        .weather-temp { font-size: 16px; font-weight: bold; }
+        .weather-icon { font-size: 18px; }
+        
     </style>
 </head>
 <body>
@@ -494,7 +513,9 @@
 
 <div class="header">
     <button class="menu-btn" onclick="toggleMenu()">☰</button>
-    <h2>✨ AudioDisk</h2>
+    <div id="weatherStrip" style="display: flex; gap: 8px; overflow-x: auto; flex: 1; justify-content: center;">
+        <!-- Блоки погоды будут добавлены через JS -->
+    </div>
 </div>
 
 <div id="page-map" class="page">
@@ -989,6 +1010,9 @@
         // Обновляем аватар и логин в меню
         updateMenuAvatar();
         updateMenuLogin();
+        
+        // ПОГОДА
+        setTimeout(() => updateWeather(), 1000);
     }
     
     async function login() {
@@ -1037,6 +1061,9 @@
         // Обновляем аватар и логин в меню
         updateMenuAvatar();
         updateMenuLogin();
+        
+        // ПОГОДА
+        setTimeout(() => updateWeather(), 1000);
     }
 
     async function updateLastActive() {
@@ -1090,6 +1117,9 @@
             // Обновляем аватар и логин в меню
             updateMenuAvatar();
             updateMenuLogin();
+            
+            // ПОГОДА
+            setTimeout(() => updateWeather(), 1000);
         } else {
             openModal('authModal');
         }
@@ -1311,6 +1341,9 @@
                 const { latitude, longitude } = pos.coords;
                 userMarker = L.marker([latitude, longitude]).addTo(map);
                 map.setView([latitude, longitude], 15);
+                
+                // ВЫЗОВ ПОГОДЫ
+                updateWeather();
                 
                 // ОБНОВЛЯЕМ МАРКЕРЫ ПРИ ДВИЖЕНИИ
                 navigator.geolocation.watchPosition(async (newPos) => {
@@ -2536,6 +2569,94 @@
             menuLogin.innerText = currentUser.login;
         }
     }    
+
+    async function updateWeather() {
+        if (!navigator.geolocation) return;
+        
+        navigator.geolocation.getCurrentPosition(async (pos) => {
+            const lat = pos.coords.latitude;
+            const lon = pos.coords.longitude;
+            
+            try {
+                const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m,weathercode&timezone=auto`;
+                const res = await fetch(url);
+                const data = await res.json();
+                
+                const now = new Date();
+                const currentHour = now.getHours();
+                const hourlyTemp = data.hourly.temperature_2m;
+                const hourlyCode = data.hourly.weathercode;
+                
+                function getWeatherIcon(code) {
+                    if (code === 0 || code === 1) return '☀️';
+                    if (code === 2) return '⛅';
+                    if (code === 3) return '☁️';
+                    if (code >= 51 && code <= 67) return '🌧️';
+                    if (code >= 71 && code <= 77) return '❄️';
+                    if (code >= 80 && code <= 82) return '🌧️';
+                    if (code >= 95 && code <= 99) return '⛈️';
+                    return '🌡️';
+                }
+                
+                // Получаем температуру и иконку для указанного часа
+                function getTempAndIcon(hour) {
+                    const temp = Math.round(hourlyTemp[hour]);
+                    const code = hourlyCode[hour];
+                    const sign = temp > 0 ? `+${temp}` : `${temp}`;
+                    return { temp: sign, icon: getWeatherIcon(code) };
+                }
+                
+                // Определяем часы для каждого периода
+                // Утро: 6-11, берём час 9
+                // День: 12-17, берём час 14
+                // Вечер: 18-22, берём час 20
+                // Ночь: 23-5, берём час 1 (следующего дня)
+                let morningHour = 9;
+                let dayHour = 14;
+                let eveningHour = 20;
+                let nightHour = 1;
+                
+                // Корректировка, если запрошенный час выходит за пределы массива
+                if (nightHour < 6 && nightHour <= currentHour) {
+                    nightHour += 24;
+                }
+                
+                const morning = getTempAndIcon(morningHour);
+                const day = getTempAndIcon(dayHour);
+                const evening = getTempAndIcon(eveningHour);
+                
+                let night;
+                if (nightHour <= 23) {
+                    night = getTempAndIcon(nightHour);
+                } else {
+                    night = getTempAndIcon(nightHour - 24);
+                }
+                
+                const weatherStrip = document.getElementById('weatherStrip');
+                weatherStrip.innerHTML = `
+                    <div class="weather-block morning">
+                        <span class="weather-icon">${morning.icon}</span>
+                        <span class="weather-temp">${morning.temp}°</span>
+                    </div>
+                    <div class="weather-block day">
+                        <span class="weather-icon">${day.icon}</span>
+                        <span class="weather-temp">${day.temp}°</span>
+                    </div>
+                    <div class="weather-block evening">
+                        <span class="weather-icon">${evening.icon}</span>
+                        <span class="weather-temp">${evening.temp}°</span>
+                    </div>
+                    <div class="weather-block night">
+                        <span class="weather-icon">${night.icon}</span>
+                        <span class="weather-temp">${night.temp}°</span>
+                    </div>
+                `;
+                
+            } catch(e) {
+                console.log('Ошибка погоды:', e);
+            }
+        });
+    }
     
     // ========== UI ==========
     function openModal(id) { document.getElementById(id).classList.add('active'); }
