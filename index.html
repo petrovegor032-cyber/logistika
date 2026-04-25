@@ -1310,6 +1310,7 @@
                     if (userMarker) {
                         userMarker.setLatLng([newPos.coords.latitude, newPos.coords.longitude]);
                         map.setView([newPos.coords.latitude, newPos.coords.longitude], 15);
+                        updateLastActive();
                     }
                     
                     // Обновляем позицию в объявлениях пользователя
@@ -2009,6 +2010,7 @@
                     stream.getTracks().forEach(t => t.stop());
                 };
                 mediaRecorder.start();
+                updateLastActive();
                 document.getElementById('recordBtn').style.background = '#dc3545';
                 setTimeout(() => { if (mediaRecorder?.state === 'recording') toggleRecording(); }, 30000);
             } catch(e) { showToast('Нет доступа к микрофону'); }
