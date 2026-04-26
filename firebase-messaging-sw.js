@@ -1,10 +1,7 @@
-// ========== firebase-messaging-sw.js ==========
-// ПОЛНОСТЬЮ ЗАМЕНИТЬ ФАЙЛ
-
+// firebase-messaging-sw.js
 importScripts('https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging-compat.js');
 
-// Конфигурация Firebase (скопирована из index.html)
 firebase.initializeApp({
     apiKey: "AIzaSyCCIY9lL15FpypsI310HCuTxQSwkpCpuiE",
     authDomain: "audiozvonok-b340d.firebaseapp.com",
@@ -17,47 +14,22 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
-// Обработка фоновых сообщений
 messaging.onBackgroundMessage((payload) => {
     console.log('[SW] Фоновое сообщение:', payload);
     
-    const notificationTitle = payload.notification?.title || 'Новое сообщение';
-    const notificationOptions = {
+    const title = payload.notification?.title || 'Новое сообщение';
+    const options = {
         body: payload.notification?.body || 'У вас новое сообщение',
         icon: '/favicon.ico',
         badge: '/favicon.ico',
-        data: payload.data,
-        requireInteraction: true,
         vibrate: [200, 100, 200],
-        silent: false
+        data: payload.data
     };
     
-    self.registration.showNotification(notificationTitle, notificationOptions);
+    self.registration.showNotification(title, options);
 });
 
-// Обработка клика по уведомлению
 self.addEventListener('notificationclick', (event) => {
-    console.log('[SW] Клик по уведомлению:', event);
     event.notification.close();
-    
-    event.waitUntil(
-        clients.matchAll({ type: 'window', includeUncontrolled: true })
-            .then((clientList) => {
-                if (clientList.length > 0) {
-                    return clientList[0].focus();
-                }
-                return clients.openWindow('/');
-            })
-    );
-});
-
-// Service Worker установка и активация
-self.addEventListener('install', (event) => {
-    console.log('[SW] Установлен');
-    self.skipWaiting();
-});
-
-self.addEventListener('activate', (event) => {
-    console.log('[SW] Активирован');
-    event.waitUntil(clients.claim());
+    event.waitUntil(clients.openWindow('/'));
 });
