@@ -762,40 +762,44 @@
         try {
             const permission = await Notification.requestPermission();
             if (permission !== 'granted') {
-                console.log('❌ Разрешение на уведомления не получено');
+                console.log('❌ Разрешение не получено');
                 return false;
             }
             
-            console.log('✅ Разрешение на уведомления получено');
+            console.log('✅ Разрешение получено');
             
+            // ПРАВИЛЬНЫЙ ПУТЬ К SERVICE WORKER
             let registration;
+            const swPath = '/firebase-messaging-sw.js';
+            
             try {
-                registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
-                console.log('✅ Service Worker зарегистрирован:', registration);
-            } catch (swError) {
-                registration = await navigator.serviceWorker.register('./firebase-messaging-sw.js');
-                console.log('✅ Service Worker зарегистрирован (альтернативный путь):', registration);
+                registration = await navigator.serviceWorker.register(swPath);
+                console.log('✅ SW зарегистрирован:', swPath);
+            } catch (e) {
+                console.error('❌ Ошибка регистрации SW:', e);
+                return false;
             }
             
+            // Ждём активации
             if (!registration.active) {
-                console.log('⏳ Ожидаем активации Service Worker...');
-                await new Promise((resolve) => {
-                    const checkInterval = setInterval(() => {
+                await new Promise(resolve => {
+                    const check = setInterval(() => {
                         if (registration.active) {
-                            clearInterval(checkInterval);
+                            clearInterval(check);
                             resolve();
                         }
                     }, 100);
                     setTimeout(() => {
-                        clearInterval(checkInterval);
+                        clearInterval(check);
                         resolve();
                     }, 5000);
                 });
             }
             
-            const VAPID_KEY = "BE6NegQIKwFXc-Sv26u5VDnqfTzj-UvevRdoDPaTWMDLJ1kn_CJ-qzyPpPwlW2Hhv28dWHWzd69KJnTNVCylvVgBOKPupxrFLh6_ZgfQI8hHhiTwmVqjN2eUOUseATGadXmbwlXXp6m15HC2VtlRdNd6MZHawj-OlYfu6nBHAkGD5w";
-            
             const messaging = firebase.messaging();
+            
+            // ПРАВИЛЬНЫЙ VAPID КЛЮЧ (цельный)
+            const VAPID_KEY = "BE6NegQIKwFXc-Sv26u5VDnqfTzj-UvevRdoDPaTWMDLJ1kn_CJ-qzyPpPwlW2Hhv28dWHWzd69KJnTNVCylvVgBOKPupxrFLh6_ZgfQI8hHhiTwmVqjN2eUOUseATGadXmbwlXXp6m15HC2VtlRdNd6MZHawj-OlYfu6nBHAkGD5w";
             
             let token;
             try {
@@ -803,31 +807,31 @@
                     vapidKey: VAPID_KEY,
                     serviceWorkerRegistration: registration
                 });
-            } catch (tokenError) {
+            } catch (err) {
+                console.log('Пробуем без registration:', err);
                 token = await messaging.getToken({ vapidKey: VAPID_KEY });
             }
             
             if (token) {
-                console.log('✅ FCM Token получен:', token);
+                console.log('✅ FCM Token:', token.substring(0, 50) + '...');
                 
-                if (currentUser && currentUser.id) {
-                    const tokenKey = token.replace(/\./g, '_').replace(/:/g, '_');
+                if (currentUser?.id) {
+                    const tokenKey = token.replace(/[\.:]/g, '_');
                     await db.ref(`fcm_tokens/${currentUser.id}/${tokenKey}`).set({
                         token: token,
                         timestamp: Date.now(),
                         userAgent: navigator.userAgent
                     });
-                    console.log('✅ Токен сохранён в Firebase');
+                    console.log('✅ Токен сохранён');
                 }
-                
                 return token;
-            } else {
-                console.log('❌ Не удалось получить FCM токен');
-                return null;
             }
             
+            console.log('❌ Токен не получен');
+            return null;
+            
         } catch(e) {
-            console.error('❌ Ошибка инициализации уведомлений:', e);
+            console.error('❌ Ошибка:', e);
             return null;
         }
     }
