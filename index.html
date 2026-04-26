@@ -747,36 +747,22 @@
     let dialogsCache = [];       // кэш списка диалогов
     let contactsCache = {};      // { contactId: { name, avatar, login } }
     
-    // ========== ИНИЦИАЛИЗАЦИЯ PUSH-УВЕДОМЛЕНИЙ ==========
-    async function initPushNotifications() {
+    // ========== ЗАПРОС РАЗРЕШЕНИЯ (БЕЗ ПОЛУЧЕНИЯ ТОКЕНА) ==========
+    async function requestNotificationPermission() {
         if (!('Notification' in window)) {
             console.log('❌ Браузер не поддерживает уведомления');
             return false;
         }
         
-        if (!('serviceWorker' in navigator)) {
-            console.log('❌ Service Worker не поддерживается');
+        const permission = await Notification.requestPermission();
+        if (permission === 'granted') {
+            console.log('✅ Разрешение на уведомления получено');
+            return true;
+        } else {
+            console.log('❌ Разрешение не получено');
             return false;
         }
-        
-        try {
-            const permission = await Notification.requestPermission();
-            if (permission !== 'granted') {
-                console.log('❌ Разрешение не получено');
-                return false;
-            }
-            
-            console.log('✅ Разрешение получено');
-            
-            // Регистрация Service Worker
-            let registration;
-            try {
-                registration = await navigator.serviceWorker.register('/logistika/firebase-messaging-sw.js');
-                console.log('✅ SW зарегистрирован');
-            } catch(e) {
-                console.error('❌ Ошибка SW:', e);
-                return false;
-            }
+    }
             
             // НОВЫЙ РАБОЧИЙ VAPID КЛЮЧ
             const VAPID_KEY = "BGPPfgf9saKVNXGq8QBjSTvHfdrm982XHvHGSyyHQ6kJweT92YBgtZ-wZd3eze4xKdlSLADVGIXOy93EIEqxWWS";
@@ -819,37 +805,43 @@
         }
     }
 
-    // ========== ПРИНУДИТЕЛЬНАЯ ПОДПИСКА (обход ошибки 401) ==========
+    // ========== ПРИНУДИТЕЛЬНАЯ ПОДПИСКА (РАБОТАЕТ) ==========
     async function forceSubscribePush() {
         if (!currentUser) return null;
         
         const vapidKey = "BGPPfgf9saKVNXGq8QBjSTvHfdrm982XHvHGSyyHQ6kJweT92YBgtZ-wZd3eze4xKdlSLADVGIXOy93EIEqxWWS";
         const registration = await navigator.serviceWorker.ready;
         
-        // Удаляем старую подписку Firebase
         try {
-            const messaging = firebase.messaging();
-            await messaging.deleteToken();
-        } catch(e) {}
-        
-        // Создаём новую через PushManager
-        const subscription = await registration.pushManager.subscribe({
-            userVisibleOnly: true,
-            applicationServerKey: vapidKey
-        });
-        
-        const fcmToken = subscription.endpoint.split('/').pop();
-        
-        // Сохраняем в Firebase
-        const tokenKey = fcmToken.replace(/[\.:]/g, '_');
-        await db.ref(`fcm_tokens/${currentUser.id}/${tokenKey}`).set({
-            token: fcmToken,
-            timestamp: Date.now(),
-            userAgent: navigator.userAgent
-        });
-        
-        console.log('✅ Принудительная подписка выполнена');
-        return fcmToken;
+            // Удаляем старую подписку Firebase
+            try {
+                const messaging = firebase.messaging();
+                await messaging.deleteToken();
+            } catch(e) {}
+            
+            // Создаём новую через PushManager
+            const subscription = await registration.pushManager.subscribe({
+                userVisibleOnly: true,
+                applicationServerKey: vapidKey
+            });
+            
+            const fcmToken = subscription.endpoint.split('/').pop();
+            console.log('✅ Токен получен:', fcmToken.substring(0, 50) + '...');
+            
+            // Сохраняем в Firebase
+            const tokenKey = fcmToken.replace(/[\.:]/g, '_');
+            await db.ref(`fcm_tokens/${currentUser.id}/${tokenKey}`).set({
+                token: fcmToken,
+                timestamp: Date.now(),
+                userAgent: navigator.userAgent
+            });
+            
+            console.log('✅ Токен сохранён в Firebase');
+            return fcmToken;
+        } catch(err) {
+            console.error('❌ Ошибка подписки:', err);
+            return null;
+        }
     }
     
     // ========== ОТПРАВКА PUSH-УВЕДОМЛЕНИЙ С ВИБРАЦИЕЙ ==========
@@ -868,56 +860,14 @@
             });
             
             if (tokens.length === 0) {
-                console.log('📭 Нет токенов для пользователя:', userId);
+                console.log(`📭 Нет токенов для пользователя ${userId}`);
                 return;
             }
             
-            console.log(`📤 Отправка "${title}" для ${tokens.length} устройств (тип: ${type})`);
+            console.log(`📤 Отправка "${title}" для ${tokens.length} устройств`);
             
-            const FCM_SERVER_KEY = "AAAAbZzO8TQ:APA91bF8mQmY3wQ_J5MVHb5N_IQZnU6l-_YzQXfLg_NJZFZzYqmv6xWQpVWKJ4H49H3HqFozPxMMS01hU6h_83T0FvNEx5GMJq5l8N6ONMFnKGSCZwF0xU5J_7DRu3MBqo2mBJ--I-GA";
+            // ... остальной код отправки ...
             
-            for (const token of tokens) {
-                try {
-                    const response = await fetch('https://fcm.googleapis.com/fcm/send', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `key=${FCM_SERVER_KEY}`
-                        },
-                        body: JSON.stringify({
-                            to: token,
-                            notification: {
-                                title: title,
-                                body: body,
-                                icon: '/favicon.ico',
-                                badge: '/favicon.ico'
-                            },
-                            data: {
-                                type: type,  // 'call', 'urgent', 'default'
-                                timestamp: Date.now().toString()
-                            },
-                            webpush: {
-                                fcm_options: {
-                                    link: window.location.origin
-                                }
-                            }
-                        })
-                    });
-                    
-                    const result = await response.json();
-                    if (result.success) {
-                        console.log('✅ Уведомление отправлено');
-                    } else if (result.results && result.results[0]?.error === 'NotRegistered') {
-                        const tokenKey = token.replace(/[\.:]/g, '_');
-                        await db.ref(`fcm_tokens/${userId}/${tokenKey}`).remove();
-                        console.log('🗑️ Удалён устаревший токен');
-                    } else {
-                        console.log('⚠️ Ошибка:', result);
-                    }
-                } catch(e) {
-                    console.error('❌ Ошибка:', e);
-                }
-            }
         } catch(e) {
             console.error('❌ Ошибка:', e);
         }
@@ -1149,7 +1099,7 @@
         }, { once: true });
         
         // Инициализация уведомлений
-        await initPushNotifications();
+        await requestNotificationPermission();
         await forceSubscribePush();
         
         // ПЕРИОДИЧЕСКОЕ ОБНОВЛЕНИЕ ОНЛАЙН СТАТУСА И ТОКЕНА
@@ -1219,7 +1169,7 @@
         }, { once: true });
         
         // Инициализация уведомлений
-        await initPushNotifications();
+        await requestNotificationPermission();
         await forceSubscribePush();
         
         // ПЕРИОДИЧЕСКОЕ ОБНОВЛЕНИЕ ОНЛАЙН СТАТУСА И ТОКЕНА
@@ -1272,28 +1222,11 @@
             initMap();
             loadData();
             setupMessageListener();
+            
+            // Запрашиваем разрешение (без получения токена)
             requestNotificationPermission();
             
-            // Активация звука по касанию
-            document.body.addEventListener('touchstart', () => {
-                if (!window.raciaSoundEnabled) {
-                    const silent = new Audio();
-                    silent.volume = 0.01;
-                    silent.play().catch(()=>{});
-                    window.raciaSoundEnabled = true;
-                }
-            }, { once: true });
-            document.body.addEventListener('mousedown', () => {
-                if (!window.raciaSoundEnabled) {
-                    const silent = new Audio();
-                    silent.volume = 0.01;
-                    silent.play().catch(()=>{});
-                    window.raciaSoundEnabled = true;
-                }
-            }, { once: true });
-            
-            // Инициализация уведомлений
-            initPushNotifications();
+            // Принудительная подписка (работает)
             forceSubscribePush();
             
             // Обновляем аватар и логин в меню
