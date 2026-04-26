@@ -768,10 +768,10 @@
             
             console.log('✅ Разрешение получено');
             
-            // ПРАВИЛЬНЫЙ ПУТЬ К SERVICE WORKER
-            let registration;
-            const swPath = '/firebase-messaging-sw.js';
+            // ПРАВИЛЬНЫЙ ПУТЬ К SERVICE WORKER (ваш файл в папке logistika/)
+            const swPath = '/logistika/firebase-messaging-sw.js';
             
+            let registration;
             try {
                 registration = await navigator.serviceWorker.register(swPath);
                 console.log('✅ SW зарегистрирован:', swPath);
@@ -798,7 +798,6 @@
             
             const messaging = firebase.messaging();
             
-            // ПРАВИЛЬНЫЙ VAPID КЛЮЧ (цельный)
             const VAPID_KEY = "BE6NegQIKwFXc-Sv26u5VDnqfTzj-UvevRdoDPaTWMDLJ1kn_CJ-qzyPpPwlW2Hhv28dWHWzd69KJnTNVCylvVgBOKPupxrFLh6_ZgfQI8hHhiTwmVqjN2eUOUseATGadXmbwlXXp6m15HC2VtlRdNd6MZHawj-OlYfu6nBHAkGD5w";
             
             let token;
