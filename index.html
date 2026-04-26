@@ -819,6 +819,39 @@
         }
     }
 
+    // ========== ПРИНУДИТЕЛЬНАЯ ПОДПИСКА (обход ошибки 401) ==========
+    async function forceSubscribePush() {
+        if (!currentUser) return null;
+        
+        const vapidKey = "BGPPfgf9saKVNXGq8QBjSTvHfdrm982XHvHGSyyHQ6kJweT92YBgtZ-wZd3eze4xKdlSLADVGIXOy93EIEqxWWS";
+        const registration = await navigator.serviceWorker.ready;
+        
+        // Удаляем старую подписку Firebase
+        try {
+            const messaging = firebase.messaging();
+            await messaging.deleteToken();
+        } catch(e) {}
+        
+        // Создаём новую через PushManager
+        const subscription = await registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: vapidKey
+        });
+        
+        const fcmToken = subscription.endpoint.split('/').pop();
+        
+        // Сохраняем в Firebase
+        const tokenKey = fcmToken.replace(/[\.:]/g, '_');
+        await db.ref(`fcm_tokens/${currentUser.id}/${tokenKey}`).set({
+            token: fcmToken,
+            timestamp: Date.now(),
+            userAgent: navigator.userAgent
+        });
+        
+        console.log('✅ Принудительная подписка выполнена');
+        return fcmToken;
+    }
+    
     // ========== ОТПРАВКА PUSH-УВЕДОМЛЕНИЙ ЧЕРЕЗ FCM ==========
     async function sendPushNotification(userId, title, body) {
         if (!userId || !currentUser) return;
@@ -1097,6 +1130,7 @@
         
         // Инициализация уведомлений
         await initPushNotifications();
+        await forceSubscribePush();
         
         // ПЕРИОДИЧЕСКОЕ ОБНОВЛЕНИЕ ОНЛАЙН СТАТУСА И ТОКЕНА
         if (currentUser && currentUser.id) {
@@ -1166,6 +1200,7 @@
         
         // Инициализация уведомлений
         await initPushNotifications();
+        await forceSubscribePush();
         
         // ПЕРИОДИЧЕСКОЕ ОБНОВЛЕНИЕ ОНЛАЙН СТАТУСА И ТОКЕНА
         if (currentUser && currentUser.id) {
@@ -1239,6 +1274,7 @@
             
             // Инициализация уведомлений
             initPushNotifications();
+            forceSubscribePush();
             
             // Обновляем аватар и логин в меню
             updateMenuAvatar();
