@@ -768,37 +768,20 @@
             
             console.log('✅ Разрешение получено');
             
-            // ПРАВИЛЬНЫЙ ПУТЬ К SERVICE WORKER (ваш файл в папке logistika/)
-            const swPath = '/logistika/firebase-messaging-sw.js';
-            
+            // Регистрация Service Worker
             let registration;
             try {
-                registration = await navigator.serviceWorker.register(swPath);
-                console.log('✅ SW зарегистрирован:', swPath);
-            } catch (e) {
-                console.error('❌ Ошибка регистрации SW:', e);
+                registration = await navigator.serviceWorker.register('/logistika/firebase-messaging-sw.js');
+                console.log('✅ SW зарегистрирован');
+            } catch(e) {
+                console.error('❌ Ошибка SW:', e);
                 return false;
             }
             
-            // Ждём активации
-            if (!registration.active) {
-                await new Promise(resolve => {
-                    const check = setInterval(() => {
-                        if (registration.active) {
-                            clearInterval(check);
-                            resolve();
-                        }
-                    }, 100);
-                    setTimeout(() => {
-                        clearInterval(check);
-                        resolve();
-                    }, 5000);
-                });
-            }
+            // НОВЫЙ РАБОЧИЙ VAPID КЛЮЧ
+            const VAPID_KEY = "BGPPfgf9saKVNXGq8QBjSTvHfdrm982XHvHGSyyHQ6kJweT92YBgtZ-wZd3eze4xKdlSLADVGIXOy93EIEqxWWS";
             
             const messaging = firebase.messaging();
-            
-            const VAPID_KEY = "BE6NegQIKwFXc-Sv26u5VDnqfTzj-UvevRdoDPaTWMDLJ1kn_CJ-qzyPpPwlW2Hhv28dWHWzd69KJnTNVCylvVgBOKPupxrFLh6_ZgfQI8hHhiTwmVqjN2eUOUseATGadXmbwlXXp6m15HC2VtlRdNd6MZHawj-OlYfu6nBHAkGD5w";
             
             let token;
             try {
@@ -806,22 +789,23 @@
                     vapidKey: VAPID_KEY,
                     serviceWorkerRegistration: registration
                 });
-            } catch (err) {
+            } catch(err) {
                 console.log('Пробуем без registration:', err);
                 token = await messaging.getToken({ vapidKey: VAPID_KEY });
             }
             
             if (token) {
-                console.log('✅ FCM Token:', token.substring(0, 50) + '...');
+                console.log('✅ FCM Token получен:', token.substring(0, 50) + '...');
                 
-                if (currentUser?.id) {
+                // Сохраняем токен в Firebase
+                if (currentUser && currentUser.id) {
                     const tokenKey = token.replace(/[\.:]/g, '_');
                     await db.ref(`fcm_tokens/${currentUser.id}/${tokenKey}`).set({
                         token: token,
                         timestamp: Date.now(),
                         userAgent: navigator.userAgent
                     });
-                    console.log('✅ Токен сохранён');
+                    console.log('✅ Токен сохранён в Firebase');
                 }
                 return token;
             }
@@ -836,11 +820,10 @@
     }
 
     // ========== ОТПРАВКА PUSH-УВЕДОМЛЕНИЙ ЧЕРЕЗ FCM ==========
-    async function sendPushNotification(userId, title, body, link = null) {
+    async function sendPushNotification(userId, title, body) {
         if (!userId || !currentUser) return;
         
         try {
-            // Получаем все токены пользователя
             const tokensSnapshot = await db.ref(`fcm_tokens/${userId}`).once('value');
             const tokens = [];
             
@@ -856,12 +839,10 @@
                 return;
             }
             
-            console.log(`📤 Отправка уведомления ${title} для ${tokens.length} устройств`);
+            console.log(`📤 Отправка "${title}" для ${tokens.length} устройств`);
             
-            // FCM серверный ключ
             const FCM_SERVER_KEY = "AAAAbZzO8TQ:APA91bF8mQmY3wQ_J5MVHb5N_IQZnU6l-_YzQXfLg_NJZFZzYqmv6xWQpVWKJ4H49H3HqFozPxMMS01hU6h_83T0FvNEx5GMJq5l8N6ONMFnKGSCZwF0xU5J_7DRu3MBqo2mBJ--I-GA";
             
-            // Отправляем на каждый токен
             for (const token of tokens) {
                 try {
                     const response = await fetch('https://fcm.googleapis.com/fcm/send', {
@@ -877,12 +858,11 @@
                                 body: body,
                                 icon: '/favicon.ico',
                                 badge: '/favicon.ico',
-                                vibrate: [200, 100, 200],
-                                click_action: link || window.location.origin
+                                vibrate: [200, 100, 200]
                             },
                             webpush: {
                                 fcm_options: {
-                                    link: link || window.location.origin
+                                    link: window.location.origin
                                 }
                             }
                         })
@@ -890,22 +870,18 @@
                     
                     const result = await response.json();
                     if (result.success) {
-                        console.log('✅ Уведомление отправлено на токен:', token.substring(0, 20) + '...');
+                        console.log('✅ Уведомление отправлено');
                     } else if (result.results && result.results[0]?.error === 'NotRegistered') {
-                        // Токен устарел, удаляем
-                        const tokenKey = token.replace(/\./g, '_').replace(/:/g, '_');
+                        const tokenKey = token.replace(/[\.:]/g, '_');
                         await db.ref(`fcm_tokens/${userId}/${tokenKey}`).remove();
                         console.log('🗑️ Удалён устаревший токен');
-                    } else {
-                        console.log('⚠️ Ошибка отправки:', result);
                     }
                 } catch(e) {
-                    console.error('❌ Ошибка при отправке на токен:', e);
+                    console.error('❌ Ошибка отправки:', e);
                 }
             }
-            
         } catch(e) {
-            console.error('❌ Ошибка отправки push-уведомления:', e);
+            console.error('❌ Ошибка:', e);
         }
     }
     
