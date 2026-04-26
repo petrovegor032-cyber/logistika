@@ -852,69 +852,25 @@
         return fcmToken;
     }
     
-    // ========== ОТПРАВКА PUSH-УВЕДОМЛЕНИЙ ЧЕРЕЗ FCM ==========
+    // ========== ОТПРАВКА PUSH-УВЕДОМЛЕНИЙ ЧЕРЕЗ ВАШ СЕРВЕР ==========
     async function sendPushNotification(userId, title, body) {
         if (!userId || !currentUser) return;
         
         try {
-            const tokensSnapshot = await db.ref(`fcm_tokens/${userId}`).once('value');
-            const tokens = [];
-            
-            tokensSnapshot.forEach(child => {
-                const tokenData = child.val();
-                if (tokenData && tokenData.token) {
-                    tokens.push(tokenData.token);
-                }
+            const response = await fetch('https://ВАШ-ПРОЕКТ.vercel.app/api/send-notification', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId, title, body })
             });
             
-            if (tokens.length === 0) {
-                console.log('📭 Нет токенов для пользователя:', userId);
-                return;
-            }
-            
-            console.log(`📤 Отправка "${title}" для ${tokens.length} устройств`);
-            
-            const FCM_SERVER_KEY = "AAAAbZzO8TQ:APA91bF8mQmY3wQ_J5MVHb5N_IQZnU6l-_YzQXfLg_NJZFZzYqmv6xWQpVWKJ4H49H3HqFozPxMMS01hU6h_83T0FvNEx5GMJq5l8N6ONMFnKGSCZwF0xU5J_7DRu3MBqo2mBJ--I-GA";
-            
-            for (const token of tokens) {
-                try {
-                    const response = await fetch('https://fcm.googleapis.com/fcm/send', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `key=${FCM_SERVER_KEY}`
-                        },
-                        body: JSON.stringify({
-                            to: token,
-                            notification: {
-                                title: title,
-                                body: body,
-                                icon: '/favicon.ico',
-                                badge: '/favicon.ico',
-                                vibrate: [200, 100, 200]
-                            },
-                            webpush: {
-                                fcm_options: {
-                                    link: window.location.origin
-                                }
-                            }
-                        })
-                    });
-                    
-                    const result = await response.json();
-                    if (result.success) {
-                        console.log('✅ Уведомление отправлено');
-                    } else if (result.results && result.results[0]?.error === 'NotRegistered') {
-                        const tokenKey = token.replace(/[\.:]/g, '_');
-                        await db.ref(`fcm_tokens/${userId}/${tokenKey}`).remove();
-                        console.log('🗑️ Удалён устаревший токен');
-                    }
-                } catch(e) {
-                    console.error('❌ Ошибка отправки:', e);
-                }
+            const result = await response.json();
+            if (result.success) {
+                console.log('✅ Уведомление отправлено через сервер');
+            } else {
+                console.error('❌ Ошибка:', result.error);
             }
         } catch(e) {
-            console.error('❌ Ошибка:', e);
+            console.error('❌ Ошибка запроса к серверу:', e);
         }
     }
     
