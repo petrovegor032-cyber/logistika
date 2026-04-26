@@ -852,8 +852,8 @@
         return fcmToken;
     }
     
-    // ========== ОТПРАВКА PUSH-УВЕДОМЛЕНИЙ (ОБХОД CORS) ==========
-    async function sendPushNotification(userId, title, body) {
+    // ========== ОТПРАВКА PUSH-УВЕДОМЛЕНИЙ С ВИБРАЦИЕЙ ==========
+    async function sendPushNotification(userId, title, body, type = 'default') {
         if (!userId || !currentUser) return;
         
         try {
@@ -872,27 +872,52 @@
                 return;
             }
             
-            console.log(`📤 Отправка "${title}" для ${tokens.length} устройств`);
+            console.log(`📤 Отправка "${title}" для ${tokens.length} устройств (тип: ${type})`);
             
             const FCM_SERVER_KEY = "AAAAbZzO8TQ:APA91bF8mQmY3wQ_J5MVHb5N_IQZnU6l-_YzQXfLg_NJZFZzYqmv6xWQpVWKJ4H49H3HqFozPxMMS01hU6h_83T0FvNEx5GMJq5l8N6ONMFnKGSCZwF0xU5J_7DRu3MBqo2mBJ--I-GA";
             
             for (const token of tokens) {
-                // Используем Image-запрос для обхода CORS
-                const img = new Image();
-                const url = `https://fcm.googleapis.com/fcm/send?to=${token}&notification.title=${encodeURIComponent(title)}&notification.body=${encodeURIComponent(body)}`;
-                
-                img.onload = () => console.log('✅ Уведомление отправлено');
-                img.onerror = (e) => console.error('❌ Ошибка:', e);
-                img.src = url;
-                
-                // Альтернативный способ: скрытый iframe
-                const iframe = document.createElement('iframe');
-                iframe.style.display = 'none';
-                iframe.src = url;
-                document.body.appendChild(iframe);
-                setTimeout(() => iframe.remove(), 5000);
+                try {
+                    const response = await fetch('https://fcm.googleapis.com/fcm/send', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `key=${FCM_SERVER_KEY}`
+                        },
+                        body: JSON.stringify({
+                            to: token,
+                            notification: {
+                                title: title,
+                                body: body,
+                                icon: '/favicon.ico',
+                                badge: '/favicon.ico'
+                            },
+                            data: {
+                                type: type,  // 'call', 'urgent', 'default'
+                                timestamp: Date.now().toString()
+                            },
+                            webpush: {
+                                fcm_options: {
+                                    link: window.location.origin
+                                }
+                            }
+                        })
+                    });
+                    
+                    const result = await response.json();
+                    if (result.success) {
+                        console.log('✅ Уведомление отправлено');
+                    } else if (result.results && result.results[0]?.error === 'NotRegistered') {
+                        const tokenKey = token.replace(/[\.:]/g, '_');
+                        await db.ref(`fcm_tokens/${userId}/${tokenKey}`).remove();
+                        console.log('🗑️ Удалён устаревший токен');
+                    } else {
+                        console.log('⚠️ Ошибка:', result);
+                    }
+                } catch(e) {
+                    console.error('❌ Ошибка:', e);
+                }
             }
-            
         } catch(e) {
             console.error('❌ Ошибка:', e);
         }
@@ -939,6 +964,21 @@
             };
             reader.onerror = reject;
         });
+    }
+
+    // ========== ВИБРАЦИЯ НА УСТРОЙСТВЕ ==========
+    function vibrateDevice(pattern = [200, 100, 200]) {
+        if ('vibrate' in navigator) {
+            navigator.vibrate(pattern);
+            console.log('📳 Вибрация:', pattern);
+        } else {
+            console.log('⚠️ Вибрация не поддерживается');
+        }
+    }
+    
+    // Вызывать при звонке или важном событии
+    function vibrateCall() {
+        vibrateDevice([500, 200, 500, 200, 1000]);
     }
     
     // ========== ИСКОРКИ ==========
@@ -1970,6 +2010,7 @@
                 const contactName = contact?.name || 'Пользователь';
                 
                 showToast(`📨 Новое сообщение от ${contactName}`);
+                vibrateDevice([100, 50, 100]);  // короткая вибрация при новом сообщении
                 
                 // ОТПРАВКА PUSH УВЕДОМЛЕНИЯ
                 if (typeof sendPushNotification === 'function') {
@@ -2273,7 +2314,7 @@
         });
         
         if (typeof sendPushNotification === 'function') {
-            await sendPushNotification(targetId, 'Входящий звонок', `${currentUser.name} звонит вам`);
+            await sendPushNotification(targetId, '📞 Входящий звонок', `${currentUser.name} звонит вам`, 'call');
         }
         
         const ref = db.ref(`calls/${callId}`);
