@@ -1020,9 +1020,20 @@
     }
     
     function requestNotificationPermission() {
-        if ('Notification' in window) {
-            Notification.requestPermission();
+        if (!('Notification' in window)) {
+            console.log('❌ Браузер не поддерживает уведомления');
+            return false;
         }
+        
+        Notification.requestPermission().then(permission => {
+            if (permission === 'granted') {
+                console.log('✅ Разрешение на уведомления получено');
+                return true;
+            } else {
+                console.log('❌ Разрешение не получено');
+                return false;
+            }
+        });
     }
     
     // Активация звука по касанию (глобальная функция)
@@ -1100,7 +1111,7 @@
         
         // Инициализация уведомлений
         await requestNotificationPermission();
-        await forceSubscribePush();
+        forceSubscribePush();
         
         // ПЕРИОДИЧЕСКОЕ ОБНОВЛЕНИЕ ОНЛАЙН СТАТУСА И ТОКЕНА
         if (currentUser && currentUser.id) {
@@ -1170,7 +1181,7 @@
         
         // Инициализация уведомлений
         await requestNotificationPermission();
-        await forceSubscribePush();
+        forceSubscribePush();
         
         // ПЕРИОДИЧЕСКОЕ ОБНОВЛЕНИЕ ОНЛАЙН СТАТУСА И ТОКЕНА
         if (currentUser && currentUser.id) {
@@ -1223,11 +1234,11 @@
             loadData();
             setupMessageListener();
             
-            // Запрашиваем разрешение (без получения токена)
+            // Запрашиваем разрешение (без await)
             requestNotificationPermission();
             
-            // Принудительная подписка (работает)
-            forceSubscribePush();
+            // Принудительная подписка (без await, используем .then)
+            forceSubscribePush().catch(console.error);
             
             // Обновляем аватар и логин в меню
             updateMenuAvatar();
