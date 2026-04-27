@@ -898,21 +898,6 @@
             reader.onerror = reject;
         });
     }
-
-    // ========== ВИБРАЦИЯ НА УСТРОЙСТВЕ ==========
-    function vibrateDevice(pattern = [200, 100, 200]) {
-        if ('vibrate' in navigator) {
-            navigator.vibrate(pattern);
-            console.log('📳 Вибрация:', pattern);
-        } else {
-            console.log('⚠️ Вибрация не поддерживается');
-        }
-    }
-    
-    // Вызывать при звонке или важном событии
-    function vibrateCall() {
-        vibrateDevice([500, 200, 500, 200, 1000]);
-    }
     
     // ========== ИСКОРКИ ==========
     function initSparks() {
@@ -2809,7 +2794,7 @@
     initSparks();
     checkAuth();
 
-    // ========== ТЕСТОВАЯ ФУНКЦИЯ ДЛЯ ОТЛАДКИ (ДОБАВИТЬ В КОНЕЦ) ==========
+    // ========== ТЕСТОВАЯ ФУНКЦИЯ ДЛЯ ОТЛАДКИ ==========
     window.testPushNotification = async function() {
         if (!currentUser) {
             alert('Сначала войдите в аккаунт');
@@ -2829,12 +2814,12 @@
             console.log('Новое разрешение:', permission);
         }
         
-        console.log('3. Получение FCM токена...');
-        const token = await initPushNotifications();
+        console.log('3. Получение FCM токена через forceSubscribePush...');
+        const token = await forceSubscribePush();
         
         if (token) {
             console.log('✅ Токен получен:', token);
-            alert(`✅ Push уведомления работают!\n\nТокен: ${token.substring(0, 30)}...\n\nДля отправки тестового уведомления себе, выполните в консоли:\nsendPushNotification("${currentUser.id}", "Тест", "Это тестовое уведомление")`);
+            alert(`✅ Push уведомления работают!\n\nТокен: ${token.substring(0, 30)}...`);
         } else {
             console.log('❌ Не удалось получить токен');
             alert('❌ Ошибка получения токена. Проверьте:\n1. HTTPS соединение\n2. Service Worker\n3. VAPID ключ');
