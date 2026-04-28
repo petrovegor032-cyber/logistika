@@ -1035,7 +1035,6 @@
         if (page === 'map' && map) map.invalidateSize();
     }
     
-    // ========== АВТОРИЗАЦИЯ ==========
     // ========== РЕГИСТРАЦИЯ ==========
     async function register() {
         const login = document.getElementById('loginInput').value.trim();
@@ -1055,49 +1054,26 @@
         localStorage.setItem('user', JSON.stringify(currentUser));
         closeModal('authModal');
         initMap();
-        loadData();
+        
+        // Загружаем данные (один раз)
+        await loadData();
         setupMessageListener();
         showToast('Регистрация успешна!');
         
         // Активация звука по касанию
-        document.body.addEventListener('touchstart', () => {
-            if (!window.raciaSoundEnabled) {
-                const silent = new Audio();
-                silent.volume = 0.01;
-                silent.play().catch(()=>{});
-                window.raciaSoundEnabled = true;
-            }
-        }, { once: true });
-        document.body.addEventListener('mousedown', () => {
-            if (!window.raciaSoundEnabled) {
-                const silent = new Audio();
-                silent.volume = 0.01;
-                silent.play().catch(()=>{});
-                window.raciaSoundEnabled = true;
-            }
-        }, { once: true });
+        if (!window.raciaSoundEnabled) {
+            document.body.addEventListener('touchstart', () => {
+                if (!window.raciaSoundEnabled) {
+                    const silent = new Audio();
+                    silent.volume = 0.01;
+                    silent.play().catch(()=>{});
+                    window.raciaSoundEnabled = true;
+                }
+            }, { once: true });
+        }
         
         // Инициализация уведомлений
-        await requestNotificationPermission();
-        forceSubscribePush();
-        
-        // ПЕРИОДИЧЕСКОЕ ОБНОВЛЕНИЕ ОНЛАЙН СТАТУСА И ТОКЕНА
-        if (currentUser && currentUser.id) {
-            setInterval(async () => {
-                if (currentUser) {
-                    await db.ref(`users/${currentUser.id}/online`).set(true);
-                    await db.ref(`users/${currentUser.id}/lastActive`).set(Date.now());
-                    
-                    // Обновляем токен каждые 24 часа
-                    const lastTokenRefresh = localStorage.getItem('lastTokenRefresh');
-                    if (!lastTokenRefresh || Date.now() - parseInt(lastTokenRefresh) > 24 * 60 * 60 * 1000) {
-                        await requestNotificationPermission();
-                        forceSubscribePush();
-                        localStorage.setItem('lastTokenRefresh', Date.now().toString());
-                    }
-                }
-            }, 30000);
-        }
+        await initPushNotifications();
         
         // Обновляем аватар и логин в меню
         updateMenuAvatar();
@@ -1126,49 +1102,26 @@
         await db.ref(`users/${userId}/lastActive`).set(Date.now());
         closeModal('authModal');
         initMap();
-        loadData();
+        
+        // Загружаем данные (один раз)
+        await loadData();
         setupMessageListener();
         showToast('Добро пожаловать!');
         
         // Активация звука по касанию
-        document.body.addEventListener('touchstart', () => {
-            if (!window.raciaSoundEnabled) {
-                const silent = new Audio();
-                silent.volume = 0.01;
-                silent.play().catch(()=>{});
-                window.raciaSoundEnabled = true;
-            }
-        }, { once: true });
-        document.body.addEventListener('mousedown', () => {
-            if (!window.raciaSoundEnabled) {
-                const silent = new Audio();
-                silent.volume = 0.01;
-                silent.play().catch(()=>{});
-                window.raciaSoundEnabled = true;
-            }
-        }, { once: true });
+        if (!window.raciaSoundEnabled) {
+            document.body.addEventListener('touchstart', () => {
+                if (!window.raciaSoundEnabled) {
+                    const silent = new Audio();
+                    silent.volume = 0.01;
+                    silent.play().catch(()=>{});
+                    window.raciaSoundEnabled = true;
+                }
+            }, { once: true });
+        }
         
         // Инициализация уведомлений
-        await requestNotificationPermission();
-        forceSubscribePush();
-        
-        // ПЕРИОДИЧЕСКОЕ ОБНОВЛЕНИЕ ОНЛАЙН СТАТУСА И ТОКЕНА
-        if (currentUser && currentUser.id) {
-            setInterval(async () => {
-                if (currentUser) {
-                    await db.ref(`users/${currentUser.id}/online`).set(true);
-                    await db.ref(`users/${currentUser.id}/lastActive`).set(Date.now());
-                    
-                    // Обновляем токен каждые 24 часа
-                    const lastTokenRefresh = localStorage.getItem('lastTokenRefresh');
-                    if (!lastTokenRefresh || Date.now() - parseInt(lastTokenRefresh) > 24 * 60 * 60 * 1000) {
-                        await requestNotificationPermission();
-                        forceSubscribePush();
-                        localStorage.setItem('lastTokenRefresh', Date.now().toString());
-                    }
-                }
-            }, 30000);
-        }
+        await initPushNotifications();
         
         // Обновляем аватар и логин в меню
         updateMenuAvatar();
@@ -1223,12 +1176,24 @@
         }
     }
     
+    // ========== ВЫХОД ==========
     async function logout() {
-        if (currentUser) await db.ref(`users/${currentUser.id}/online`).set(false);
+        if (currentUser) {
+            await db.ref(`users/${currentUser.id}/online`).set(false);
+        }
         if (peerConnection) endCall();
         
         // Очищаем интервалы
         if (window.onlineInterval) clearInterval(window.onlineInterval);
+        if (window.chatListenerRef) window.chatListenerRef.off();
+        if (raciaMessagesListener) raciaMessagesListener.off();
+        
+        // Очищаем кэш
+        dialogsCache = [];
+        messagesCache = {};
+        contactsCache = {};
+        isLoadingDialogs = false;
+        lastDataLoad = 0;
         
         currentUser = null;
         localStorage.clear();
@@ -1251,87 +1216,99 @@
         }
     }
 
-    // ========== ОПТИМИЗИРОВАННАЯ ЗАГРУЗКА ДИАЛОГОВ ==========
+    // ========== ОПТИМИЗИРОВАННАЯ ЗАГРУЗКА ДИАЛОГОВ С ЗАЩИТОЙ ОТ ДУБЛИРОВАНИЯ ==========
+    let isLoadingDialogs = false;
+    let lastLoadPromise = null;
+    
     async function loadDialogs(force = false) {
+        // Защита от одновременных вызовов
+        if (isLoadingDialogs) {
+            console.log('⏳ Диалоги уже загружаются, ждём...');
+            return lastLoadPromise;
+        }
+        
         if (!force && dialogsCache.length > 0) {
             renderDialogs(dialogsCache);
             return;
         }
         
-        await loadBlockedUsers();
+        isLoadingDialogs = true;
         
-        const startTime = performance.now();
-        
-        // 1. Загружаем контакты
-        const contactsSnap = await db.ref(`contacts/${currentUser.id}`).once('value');
-        if (!contactsSnap.exists()) {
-            dialogsCache = [];
-            renderDialogs([]);
-            return;
-        }
-        
-        const contacts = contactsSnap.val();
-        const contactIds = Object.keys(contacts);
-        
-        // 2. ПАРАЛЛЕЛЬНО загружаем данные пользователей и последние сообщения
-        const [usersData, lastMessages] = await Promise.all([
-            // Загрузка всех пользователей одним запросом
-            (async () => {
-                const userPromises = contactIds.map(id => db.ref(`users/${id}`).once('value'));
-                const results = await Promise.all(userPromises);
-                const users = {};
-                results.forEach((snap, idx) => {
-                    if (snap.exists()) users[contactIds[idx]] = snap.val();
-                });
-                return users;
-            })(),
+        const promise = (async () => {
+            await loadBlockedUsers();
             
-            // Загрузка последних сообщений
-            (async () => {
-                const msgPromises = contactIds.map(id => 
-                    db.ref(`messages/${currentUser.id}/${id}`).orderByKey().limitToLast(1).once('value')
-                );
-                const results = await Promise.all(msgPromises);
-                const messages = {};
-                results.forEach((snap, idx) => {
-                    if (snap.exists()) {
-                        snap.forEach(msg => {
-                            messages[contactIds[idx]] = msg.val();
-                        });
-                    }
-                });
-                return messages;
-            })()
-        ]);
-        
-        // 3. Формируем диалоги
-        const allDialogs = [];
-        for (const contactId of contactIds) {
-            const contact = contacts[contactId];
-            const user = usersData[contactId];
-            const lastMsg = lastMessages[contactId];
+            const startTime = performance.now();
             
-            if (user && !isBlocked(contactId)) {
-                allDialogs.push({
-                    id: contactId,
-                    login: user.login,
-                    name: contact.name || user.login,
-                    avatar: user.avatar || '👤',
-                    avatarBase64: user.avatarBase64,
-                    online: user.online || false,
-                    lastMsg: lastMsg || null,
-                    lastMsgTime: lastMsg?.timestamp || 0
-                });
+            const contactsSnap = await db.ref(`contacts/${currentUser.id}`).once('value');
+            if (!contactsSnap.exists()) {
+                dialogsCache = [];
+                renderDialogs([]);
+                isLoadingDialogs = false;
+                return;
             }
-        }
+            
+            const contacts = contactsSnap.val();
+            const contactIds = Object.keys(contacts);
+            
+            const [usersData, lastMessages] = await Promise.all([
+                (async () => {
+                    const userPromises = contactIds.map(id => db.ref(`users/${id}`).once('value'));
+                    const results = await Promise.all(userPromises);
+                    const users = {};
+                    results.forEach((snap, idx) => {
+                        if (snap.exists()) users[contactIds[idx]] = snap.val();
+                    });
+                    return users;
+                })(),
+                (async () => {
+                    const msgPromises = contactIds.map(id => 
+                        db.ref(`messages/${currentUser.id}/${id}`).orderByKey().limitToLast(1).once('value')
+                    );
+                    const results = await Promise.all(msgPromises);
+                    const messages = {};
+                    results.forEach((snap, idx) => {
+                        if (snap.exists()) {
+                            snap.forEach(msg => {
+                                messages[contactIds[idx]] = msg.val();
+                            });
+                        }
+                    });
+                    return messages;
+                })()
+            ]);
+            
+            const allDialogs = [];
+            for (const contactId of contactIds) {
+                const contact = contacts[contactId];
+                const user = usersData[contactId];
+                const lastMsg = lastMessages[contactId];
+                
+                if (user && !isBlocked(contactId)) {
+                    allDialogs.push({
+                        id: contactId,
+                        login: user.login,
+                        name: contact.name || user.login,
+                        avatar: user.avatar || '👤',
+                        avatarBase64: user.avatarBase64,
+                        online: user.online || false,
+                        lastMsg: lastMsg || null,
+                        lastMsgTime: lastMsg?.timestamp || 0
+                    });
+                }
+            }
+            
+            allDialogs.sort((a, b) => b.lastMsgTime - a.lastMsgTime);
+            dialogsCache = allDialogs;
+            window.lastDialogs = allDialogs;
+            renderDialogs(allDialogs);
+            
+            const totalTime = performance.now() - startTime;
+            console.log(`✅ Диалоги загружены за ${totalTime.toFixed(2)}ms`);
+            isLoadingDialogs = false;
+        })();
         
-        allDialogs.sort((a, b) => b.lastMsgTime - a.lastMsgTime);
-        dialogsCache = allDialogs;
-        window.lastDialogs = allDialogs;
-        renderDialogs(allDialogs);
-        
-        const totalTime = performance.now() - startTime;
-        console.log(`✅ Диалоги загружены за ${totalTime.toFixed(2)}ms`);
+        lastLoadPromise = promise;
+        return promise;
     }
     
     function renderDialogs(dialogs) {
@@ -2112,9 +2089,22 @@
         if (messagesCache[currentChat.id]) {
             messagesCache[currentChat.id].push({ id: msgId, ...msgData });
             renderMessages(messagesCache[currentChat.id]);
+        } else {
+            // Если кэша нет, просто добавляем сообщение в контейнер
+            const container = document.getElementById('messages');
+            const msgHtml = `
+                <div class="message out">
+                    <div>${escapeHtml(text)}</div>
+                    <div class="message-meta">Вы • только что</div>
+                </div>
+            `;
+            container.insertAdjacentHTML('beforeend', msgHtml);
+            container.scrollTop = container.scrollHeight;
         }
         
+        // Очищаем поле ввода
         document.getElementById('messageInput').value = '';
+        document.getElementById('messageInput').style.height = 'auto';
         
         // Затем отправляем в Firebase (фоном)
         const promises = [
@@ -2124,9 +2114,9 @@
         
         await Promise.all(promises);
         
-        // Обновляем диалоги в фоне
+        // Обновляем диалоги в фоне (не блокируя UI)
         dialogsCache = [];
-        loadDialogs();
+        loadDialogs().catch(e => console.error('Ошибка обновления диалогов:', e));
     }
     
     function selectFile() { document.getElementById('fileInput').click(); }
