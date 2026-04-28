@@ -1172,7 +1172,11 @@
         if (currentUser) {
             await db.ref(`users/${currentUser.id}/online`).set(false);
         }
-        if (peerConnection) endCall();
+        
+        // Завершаем звонок если активен (используем правильную переменную)
+        if (typeof endCall === 'function') {
+            endCall();
+        }
         
         // Очищаем интервалы
         if (window.onlineInterval) clearInterval(window.onlineInterval);
