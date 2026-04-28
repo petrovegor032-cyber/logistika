@@ -1226,6 +1226,10 @@
     async function logout() {
         if (currentUser) await db.ref(`users/${currentUser.id}/online`).set(false);
         if (peerConnection) endCall();
+        
+        // Очищаем интервалы
+        if (window.onlineInterval) clearInterval(window.onlineInterval);
+        
         currentUser = null;
         localStorage.clear();
         location.reload();
@@ -1247,6 +1251,7 @@
         }
     }
 
+    // ========== ОПТИМИЗИРОВАННАЯ ЗАГРУЗКА ДИАЛОГОВ ==========
     async function loadDialogs(force = false) {
         if (!force && dialogsCache.length > 0) {
             renderDialogs(dialogsCache);
@@ -1255,41 +1260,68 @@
         
         await loadBlockedUsers();
         
-        const contactsSnap = await db.ref(`contacts/${currentUser.id}`).once('value');
-        const allDialogs = [];
+        const startTime = performance.now();
         
-        if (contactsSnap.exists()) {
-            for (const [id, data] of Object.entries(contactsSnap.val())) {
-                let user = contactsCache[id];
-                if (!user) {
-                    const userSnap = await db.ref(`users/${id}`).once('value');
-                    user = userSnap.val();
-                    if (user) {
-                        contactsCache[id] = user;
-                    }
-                }
-                
-                if (user && !isBlocked(id)) {
-                    const lastMsgSnap = await db.ref(`messages/${currentUser.id}/${id}`).orderByKey().limitToLast(1).once('value');
-                    let lastMsg = null;
-                    let lastMsgTime = 0;
-                    if (lastMsgSnap.exists()) {
-                        lastMsgSnap.forEach(msg => {
-                            lastMsg = msg.val();
-                            lastMsgTime = lastMsg.timestamp || 0;
+        // 1. Загружаем контакты
+        const contactsSnap = await db.ref(`contacts/${currentUser.id}`).once('value');
+        if (!contactsSnap.exists()) {
+            dialogsCache = [];
+            renderDialogs([]);
+            return;
+        }
+        
+        const contacts = contactsSnap.val();
+        const contactIds = Object.keys(contacts);
+        
+        // 2. ПАРАЛЛЕЛЬНО загружаем данные пользователей и последние сообщения
+        const [usersData, lastMessages] = await Promise.all([
+            // Загрузка всех пользователей одним запросом
+            (async () => {
+                const userPromises = contactIds.map(id => db.ref(`users/${id}`).once('value'));
+                const results = await Promise.all(userPromises);
+                const users = {};
+                results.forEach((snap, idx) => {
+                    if (snap.exists()) users[contactIds[idx]] = snap.val();
+                });
+                return users;
+            })(),
+            
+            // Загрузка последних сообщений
+            (async () => {
+                const msgPromises = contactIds.map(id => 
+                    db.ref(`messages/${currentUser.id}/${id}`).orderByKey().limitToLast(1).once('value')
+                );
+                const results = await Promise.all(msgPromises);
+                const messages = {};
+                results.forEach((snap, idx) => {
+                    if (snap.exists()) {
+                        snap.forEach(msg => {
+                            messages[contactIds[idx]] = msg.val();
                         });
                     }
-                    
-                    allDialogs.push({
-                        id,
-                        login: user.login,
-                        name: data.name || user.login,
-                        avatar: user.avatar || '👤',
-                        online: user.online || false,
-                        lastMsg,
-                        lastMsgTime
-                    });
-                }
+                });
+                return messages;
+            })()
+        ]);
+        
+        // 3. Формируем диалоги
+        const allDialogs = [];
+        for (const contactId of contactIds) {
+            const contact = contacts[contactId];
+            const user = usersData[contactId];
+            const lastMsg = lastMessages[contactId];
+            
+            if (user && !isBlocked(contactId)) {
+                allDialogs.push({
+                    id: contactId,
+                    login: user.login,
+                    name: contact.name || user.login,
+                    avatar: user.avatar || '👤',
+                    avatarBase64: user.avatarBase64,
+                    online: user.online || false,
+                    lastMsg: lastMsg || null,
+                    lastMsgTime: lastMsg?.timestamp || 0
+                });
             }
         }
         
@@ -1297,6 +1329,9 @@
         dialogsCache = allDialogs;
         window.lastDialogs = allDialogs;
         renderDialogs(allDialogs);
+        
+        const totalTime = performance.now() - startTime;
+        console.log(`✅ Диалоги загружены за ${totalTime.toFixed(2)}ms`);
     }
     
     function renderDialogs(dialogs) {
@@ -2057,27 +2092,12 @@
         }
     }
     
+    // ========== ОПТИМИЗИРОВАННАЯ ОТПРАВКА СООБЩЕНИЯ ==========
     async function sendMessage() {
         updateLastActive();
         
         const text = document.getElementById('messageInput').value.trim();
         if (!text || !currentChat || isBlocked(currentChat.id)) return;
-        
-        const contactExists = await db.ref(`contacts/${currentUser.id}/${currentChat.id}`).once('value');
-        if (!contactExists.exists()) {
-            const userSnap = await db.ref(`users/${currentChat.id}`).once('value');
-            const userData = userSnap.val();
-            if (userData) {
-                await db.ref(`contacts/${currentUser.id}/${currentChat.id}`).set({
-                    name: userData.name || currentChat.name,
-                    login: userData.login,
-                    added_at: Date.now()
-                });
-                showToast(`✅ ${userData.name} добавлен в контакты`);
-                dialogsCache = [];
-                await loadDialogs();
-            }
-        }
         
         const msgId = Date.now().toString();
         const msgData = {
@@ -2088,22 +2108,25 @@
             timestamp: Date.now()
         };
         
-        await Promise.all([
-            db.ref(`messages/${currentChat.id}/${currentUser.id}/${msgId}`).set(msgData),
-            db.ref(`messages/${currentUser.id}/${currentChat.id}/${msgId}`).set(msgData)
-        ]);
-        
+        // ОПТИМИЗАЦИЯ: Сначала обновляем UI (оптимистичное обновление)
         if (messagesCache[currentChat.id]) {
             messagesCache[currentChat.id].push({ id: msgId, ...msgData });
             renderMessages(messagesCache[currentChat.id]);
-        } else {
-            await loadMessages();
         }
         
-        dialogsCache = [];
-        await loadDialogs();
-        
         document.getElementById('messageInput').value = '';
+        
+        // Затем отправляем в Firebase (фоном)
+        const promises = [
+            db.ref(`messages/${currentChat.id}/${currentUser.id}/${msgId}`).set(msgData),
+            db.ref(`messages/${currentUser.id}/${currentChat.id}/${msgId}`).set(msgData)
+        ];
+        
+        await Promise.all(promises);
+        
+        // Обновляем диалоги в фоне
+        dialogsCache = [];
+        loadDialogs();
     }
     
     function selectFile() { document.getElementById('fileInput').click(); }
@@ -2771,17 +2794,50 @@
     function openAddContactModal() { openModal('addContactModal'); }
     function escapeHtml(str) { return str?.replace(/[&<>]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[m]) || ''; }
     
+    // ========== КЭШИРОВАННАЯ ЗАГРУЗКА ДАННЫХ ==========
+    let lastDataLoad = 0;
+    const CACHE_TTL = 30000; // 30 секунд
+    
     async function loadData() {
         if (!currentUser) return;
+        
+        const now = Date.now();
+        if (now - lastDataLoad < CACHE_TTL && dialogsCache.length > 0) {
+            console.log('📦 Используем кэш данных');
+            return;
+        }
+        
+        console.log('🔄 Загружаем свежие данные...');
+        lastDataLoad = now;
+        
         await loadBlockedUsers();
         await loadDialogs();
         await loadAds();
         setupCallListener();
         setupUsersListener();
-        db.ref(`users/${currentUser.id}/online`).set(true);
-        setInterval(() => {
-            if (currentUser) db.ref(`users/${currentUser.id}/online`).set(true);
+        
+        // Обновляем онлайн статус
+        await db.ref(`users/${currentUser.id}/online`).set(true);
+        await db.ref(`users/${currentUser.id}/lastActive`).set(Date.now());
+        
+        // Периодическое обновление статуса (каждые 30 секунд)
+        if (window.onlineInterval) clearInterval(window.onlineInterval);
+        window.onlineInterval = setInterval(async () => {
+            if (currentUser) {
+                await db.ref(`users/${currentUser.id}/online`).set(true);
+                await db.ref(`users/${currentUser.id}/lastActive`).set(Date.now());
+            }
         }, 30000);
+    }
+    
+    // Функция для принудительного обновления (если нужно)
+    async function forceReloadData() {
+        lastDataLoad = 0;
+        dialogsCache = [];
+        messagesCache = {};
+        contactsCache = {};
+        await loadData();
+        console.log('✅ Данные принудительно обновлены');
     }
     
     document.getElementById('messageInput')?.addEventListener('input', function() {
