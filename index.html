@@ -749,13 +749,20 @@
     
     // ========== ЗАПРОС РАЗРЕШЕНИЯ ==========
     function requestNotificationPermission() {
-        if ('Notification' in window) {
-            Notification.requestPermission().then(permission => {
-                if (permission === 'granted') {
-                    console.log('✅ Разрешение получено');
-                }
-            });
+        if (!('Notification' in window)) {
+            console.log('❌ Браузер не поддерживает уведомления');
+            return false;
         }
+        
+        Notification.requestPermission().then(permission => {
+            if (permission === 'granted') {
+                console.log('✅ Разрешение на уведомления получено');
+                return true;
+            } else {
+                console.log('❌ Разрешение не получено');
+                return false;
+            }
+        });
     }
     
     // ========== ПРИНУДИТЕЛЬНАЯ ПОДПИСКА (РАБОТАЕТ) ==========
@@ -987,23 +994,6 @@
         setTimeout(() => toast.remove(), 2000);
     }
     
-    function requestNotificationPermission() {
-        if (!('Notification' in window)) {
-            console.log('❌ Браузер не поддерживает уведомления');
-            return false;
-        }
-        
-        Notification.requestPermission().then(permission => {
-            if (permission === 'granted') {
-                console.log('✅ Разрешение на уведомления получено');
-                return true;
-            } else {
-                console.log('❌ Разрешение не получено');
-                return false;
-            }
-        });
-    }
-    
     // Активация звука по касанию (глобальная функция)
     function activateSoundOnTouch() {
         const handler = () => {
@@ -1148,22 +1138,23 @@
     });
     document.getElementById('adSearch')?.addEventListener('input', () => renderAds());
     
+    // ========== ПРОВЕРКА АВТОРИЗАЦИИ ==========
     function checkAuth() {
         const saved = localStorage.getItem('user');
         if (saved) {
             currentUser = JSON.parse(saved);
             db.ref(`users/${currentUser.id}/online`).set(true);
             initMap();
-            loadData();
-            setupMessageListener();
+            
+            // Загружаем данные (один раз)
+            loadData().then(() => {
+                setupMessageListener();
+            });
             
             // Запрашиваем разрешение
             if ('Notification' in window) {
                 Notification.requestPermission();
             }
-            
-            // Вызываем принудительную подписку (без await)
-            forceSubscribePush().catch(console.error);
             
             // Обновляем аватар и логин
             updateMenuAvatar();
@@ -1207,16 +1198,17 @@
         logout();
     }
     
-    // ========== БЛОКИРОВКА ==========
+    // ========== ЗАГРУЗКА ЗАБЛОКИРОВАННЫХ С ИНДЕКСОМ ==========
     async function loadBlockedUsers() {
-        const snapshot = await db.ref(`blocked/${currentUser.id}`).once('value');
+        // ✅ ИСПРАВЛЕНО: добавлен orderByValue для использования индекса
+        const snapshot = await db.ref(`blocked/${currentUser.id}`).orderByValue().once('value');
         blockedUsers = [];
         if (snapshot.exists()) {
             blockedUsers = Object.keys(snapshot.val());
         }
     }
 
-    // ========== ОПТИМИЗИРОВАННАЯ ЗАГРУЗКА ДИАЛОГОВ С ЗАЩИТОЙ ОТ ДУБЛИРОВАНИЯ ==========
+    // ========== ОПТИМИЗИРОВАННАЯ ЗАГРУЗКА ДИАЛОГОВ С ИНДЕКСАМИ ==========
     let isLoadingDialogs = false;
     let lastLoadPromise = null;
     
@@ -1239,7 +1231,8 @@
             
             const startTime = performance.now();
             
-            const contactsSnap = await db.ref(`contacts/${currentUser.id}`).once('value');
+            // ✅ ИСПРАВЛЕНО: добавлен orderByChild для использования индекса
+            const contactsSnap = await db.ref(`contacts/${currentUser.id}`).orderByChild('added_at').once('value');
             if (!contactsSnap.exists()) {
                 dialogsCache = [];
                 renderDialogs([]);
@@ -1586,9 +1579,21 @@
     }
     initIconPreview();
     
-    async function loadAds() {
+    // ========== ОПТИМИЗИРОВАННАЯ ЗАГРУЗКА ОБЪЯВЛЕНИЙ ==========
+    let adsCache = [];
+    let lastAdsLoad = 0;
+    const ADS_CACHE_TTL = 30000; // 30 секунд
+    
+    async function loadAds(force = false) {
+        const now = Date.now();
+        if (!force && adsCache.length > 0 && (now - lastAdsLoad) < ADS_CACHE_TTL) {
+            allAds = adsCache;
+            renderAds();
+            return;
+        }
+        
         const snapshot = await db.ref('ads').once('value');
-        allAds = [];
+        const tempAds = [];
         
         // Получаем статусы онлайн всех пользователей один раз
         const usersOnline = {};
@@ -1604,11 +1609,14 @@
                 
                 // Фильтр: не на паузе, не истекло, автор онлайн
                 if (!ad.paused && ad.expiresAt > Date.now() && userOnline) {
-                    allAds.push({ id: child.key, ...ad });
+                    tempAds.push({ id: child.key, ...ad });
                 }
             });
         }
         
+        allAds = tempAds;
+        adsCache = tempAds;
+        lastAdsLoad = now;
         renderAds();
     }
     
@@ -1924,6 +1932,9 @@
     function setupMessageListener() {
         if (!currentUser) return;
         
+        // Регистрируем push-уведомления
+        forceSubscribePush().catch(console.error);
+        
         db.ref(`messages/${currentUser.id}`).on('child_added', async (snap) => {
             const contactId = snap.key;
             const msgs = snap.val();
@@ -1938,7 +1949,7 @@
                 const contactName = contact?.name || 'Пользователь';
                 
                 showToast(`📨 Новое сообщение от ${contactName}`);
-                vibrateDevice([100, 50, 100]);  // короткая вибрация при новом сообщении
+                vibrateDevice([100, 50, 100]);
                 
                 // ОТПРАВКА PUSH УВЕДОМЛЕНИЯ
                 if (typeof sendPushNotification === 'function') {
@@ -1954,7 +1965,6 @@
             }
             
             if (currentChat && contactId === currentChat.id && !isBlocked(contactId)) {
-                // Обновляем кэш сообщений для открытого чата
                 if (messagesCache[contactId]) {
                     const newMsg = Object.values(msgs).find(m => m.timestamp === lastMsg?.timestamp);
                     if (newMsg && newMsg.from !== currentUser.id) {
