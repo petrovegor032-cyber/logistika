@@ -741,6 +741,7 @@
     let userMarker = null;
     let mediaRecorder = null;
     let blockedUsers = [];
+    let peerConnection = null;  // ← ДОБАВИТЬ ЭТУ СТРОЧКУ
     
     // КЭШ
     let messagesCache = {};
@@ -1170,18 +1171,40 @@
     // ========== ВЫХОД ==========
     async function logout() {
         if (currentUser) {
-            await db.ref(`users/${currentUser.id}/online`).set(false);
+            try {
+                await db.ref(`users/${currentUser.id}/online`).set(false);
+            } catch(e) {
+                console.error('Ошибка обновления статуса:', e);
+            }
         }
         
-        // Завершаем звонок если активен (используем правильную переменную)
+        // Завершаем звонок если активен (с проверкой)
+        if (peerConnection && typeof peerConnection.close === 'function') {
+            peerConnection.close();
+            peerConnection = null;
+        }
+        
         if (typeof endCall === 'function') {
-            endCall();
+            try {
+                endCall();
+            } catch(e) {}
         }
         
         // Очищаем интервалы
-        if (window.onlineInterval) clearInterval(window.onlineInterval);
-        if (window.chatListenerRef) window.chatListenerRef.off();
-        if (raciaMessagesListener) raciaMessagesListener.off();
+        if (window.onlineInterval) {
+            clearInterval(window.onlineInterval);
+            window.onlineInterval = null;
+        }
+        
+        if (window.chatListenerRef) {
+            window.chatListenerRef.off();
+            window.chatListenerRef = null;
+        }
+        
+        if (raciaMessagesListener) {
+            raciaMessagesListener.off();
+            raciaMessagesListener = null;
+        }
         
         // Очищаем кэш
         dialogsCache = [];
@@ -1192,6 +1215,8 @@
         
         currentUser = null;
         localStorage.clear();
+        
+        // Перезагружаем страницу
         location.reload();
     }
     
