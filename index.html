@@ -516,6 +516,18 @@
             -webkit-overflow-scrolling: touch;
         }
         
+        .sound-indicator {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.6);
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            z-index: 1000;
+            pointer-events: none;
+        }        
+        
     </style>
 </head>
 <body>
@@ -1146,23 +1158,41 @@
             currentUser = JSON.parse(saved);
             db.ref(`users/${currentUser.id}/online`).set(true);
             initMap();
+            loadData();
+            setupMessageListener();
+            requestNotificationPermission();
             
-            // Загружаем данные (один раз)
-            loadData().then(() => {
-                setupMessageListener();
-            });
+            // Активация звука по касанию
+            document.body.addEventListener('touchstart', () => {
+                if (!window.raciaSoundEnabled) {
+                    const silent = new Audio();
+                    silent.volume = 0.01;
+                    silent.play().catch(()=>{});
+                    window.raciaSoundEnabled = true;
+                }
+            }, { once: true });
+            document.body.addEventListener('mousedown', () => {
+                if (!window.raciaSoundEnabled) {
+                    const silent = new Audio();
+                    silent.volume = 0.01;
+                    silent.play().catch(()=>{});
+                    window.raciaSoundEnabled = true;
+                }
+            }, { once: true });
             
-            // Запрашиваем разрешение
-            if ('Notification' in window) {
-                Notification.requestPermission();
-            }
+            // Инициализация уведомлений
+            initPushNotifications();
             
-            // Обновляем аватар и логин
+            // Обновляем аватар и логин в меню
             updateMenuAvatar();
             updateMenuLogin();
             
-            // Погода
+            // ПОГОДА
             setTimeout(() => updateWeather(), 1000);
+            
+            // ========== АКТИВАЦИЯ ЗВУКА ДЛЯ УВЕДОМЛЕНИЙ ==========
+            initSoundActivation();
+            // ===================================================
         } else {
             openModal('authModal');
         }
@@ -1957,19 +1987,16 @@
     }
         
     // ========== ЧАТЫ ==========
-    // ========== НАСТРОЙКА СЛУШАТЕЛЯ СООБЩЕНИЙ ==========
+    // ========== НАСТРОЙКА СЛУШАТЕЛЯ СООБЩЕНИЙ (С ЗВУКОМ) ==========
     function setupMessageListener() {
         if (!currentUser) return;
-        
-        // Регистрируем push-уведомления
-        forceSubscribePush().catch(console.error);
         
         db.ref(`messages/${currentUser.id}`).on('child_added', async (snap) => {
             const contactId = snap.key;
             const msgs = snap.val();
             const lastMsg = Object.values(msgs).sort((a, b) => b.timestamp - a.timestamp)[0];
             
-            // Обновляем кэш диалогов (принудительно при новом сообщении)
+            // Обновляем кэш диалогов
             dialogsCache = [];
             await loadDialogs();
             
@@ -1978,19 +2005,15 @@
                 const contactName = contact?.name || 'Пользователь';
                 
                 showToast(`📨 Новое сообщение от ${contactName}`);
-                vibrateDevice([100, 50, 100]);
                 
-                // ОТПРАВКА PUSH УВЕДОМЛЕНИЯ
+                // Отправка push уведомления
                 if (typeof sendPushNotification === 'function') {
                     await sendPushNotification(contactId, '💬 Новое сообщение', `${contactName}: ${lastMsg.content?.substring(0, 100) || '📎 Файл'}`);
                 }
                 
-                try {
-                    const notifSound = new Audio();
-                    notifSound.src = "https://www.soundjay.com/misc/sounds/bell-ringing-01.mp3";
-                    notifSound.volume = 0.3;
-                    notifSound.play();
-                } catch(e) {}
+                // ========== ВОСПРОИЗВЕДЕНИЕ ЗВУКА ==========
+                playNotificationSound();
+                // ========== КОНЕЦ БЛОКА ЗВУКА ==========
             }
             
             if (currentChat && contactId === currentChat.id && !isBlocked(contactId)) {
@@ -2005,6 +2028,27 @@
                 }
             }
         });
+    }
+
+    // ========== ФУНКЦИЯ ВОСПРОИЗВЕДЕНИЯ ЗВУКА УВЕДОМЛЕНИЯ ==========
+    function playNotificationSound() {
+        // Проверяем, активирован ли звук пользователем
+        if (!window.soundEnabled) {
+            console.log('🔇 Звук ещё не активирован (ожидаем касания экрана)');
+            return;
+        }
+        
+        try {
+            const audio = new Audio();
+            // Короткий приятный звук уведомления
+            audio.src = "https://www.soundjay.com/misc/sounds/bell-ringing-01.mp3";
+            audio.volume = 0.4;
+            audio.play().catch(e => {
+                console.log('⚠️ Ошибка воспроизведения:', e.message);
+            });
+        } catch(e) {
+            console.log('⚠️ Ошибка аудио:', e.message);
+        }
     }
     
     function openChat(contact) {
@@ -2912,6 +2956,33 @@
     };
     
     console.log('🔥 Для теста push-уведомлений выполните: testPushNotification()');
+
+    // ========== АКТИВАЦИЯ ЗВУКА ПРИ ПЕРВОМ КАСАНИИ ==========
+    function initSoundActivation() {
+        // Создаём тихий звук для "разрешения" автовоспроизведения
+        const unlockAudio = () => {
+            const silent = new Audio();
+            silent.volume = 0.01;
+            silent.play().then(() => {
+                console.log('✅ Звук активирован');
+                window.soundEnabled = true;
+            }).catch(e => {
+                console.log('⚠️ Автовоспроизведение всё ещё заблокировано:', e);
+            });
+            // Удаляем слушатели после активации
+            document.body.removeEventListener('touchstart', unlockAudio);
+            document.body.removeEventListener('click', unlockAudio);
+        };
+        
+        // Вешаем слушатели на первое касание/клик
+        document.body.addEventListener('touchstart', unlockAudio, { once: true });
+        document.body.addEventListener('click', unlockAudio, { once: true });
+        
+        console.log('🔊 Ожидание первого касания для активации звука...');
+    }
+    
+    // Вызываем сразу при загрузке страницы
+    initSoundActivation();    
     
 </script>
 </body>
