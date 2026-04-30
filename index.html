@@ -1696,6 +1696,7 @@
     }
     
     function renderAds() {
+        if (currentUser) updateLastActive();  
         const search = document.getElementById('adSearch')?.value?.toLowerCase() || '';
         let filtered = (allAds || []).filter(ad => ad && ad.text);
         if (search) filtered = filtered.filter(ad => ad.text.toLowerCase().includes(search));
@@ -1860,6 +1861,7 @@
     }
     
     function openChat(contact) {
+        updateLastActive();  
         if (!contact) return;
         if (isBlocked(contact.id)) {
             showToast(`🔒 ${contact.name} заблокирован`);
@@ -2103,6 +2105,7 @@
     }
     
     async function loadMessages() {
+        updateLastActive();
         if (!currentChat || isBlocked(currentChat.id)) {
             document.getElementById('messages').innerHTML = '<div style="text-align:center; padding:40px;">💬 Чат недоступен</div>';
             return;
