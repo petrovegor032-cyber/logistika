@@ -1150,6 +1150,22 @@
         }
     });
     document.getElementById('adSearch')?.addEventListener('input', () => renderAds());
+
+    async function initPushNotifications() {
+        if (!('Notification' in window)) {
+            console.log('❌ Браузер не поддерживает уведомления');
+            return false;
+        }
+        
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') {
+            console.log('❌ Разрешение не получено');
+            return false;
+        }
+        
+        console.log('✅ Разрешение на уведомления получено');
+        return true;
+    }
     
     // ========== ПРОВЕРКА АВТОРИЗАЦИИ ==========
     function checkAuth() {
