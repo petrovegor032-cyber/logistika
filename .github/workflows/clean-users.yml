@@ -10,11 +10,11 @@ jobs:
     steps:
       - name: Delete users inactive for 7+ days
         run: |
-          # Получаем timestamp 7 дней назад
-          WEEK_AGO=$(($(date +%s%3N) - 7*24*60*60*1000))
+          # 7 дней в миллисекундах
+          WEEK_AGO=$(($(date +%s%3N) - 604800000))
           
-          # Находим и удаляем неактивных пользователей
+          # Удаляем пользователей с lastActive < WEEK_AGO
           curl -X DELETE "https://audiozvonok-b340d-default-rtdb.firebaseio.com/users.json?orderBy=\"lastActive\"&endAt=$WEEK_AGO" \
             2>/dev/null || true
           
-          echo "✅ Неактивные пользователи удалены"
+          echo "✅ Неактивные пользователи удалены (последняя активность более 7 дней назад)"
