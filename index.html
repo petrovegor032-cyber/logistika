@@ -2999,6 +2999,29 @@
     
     // Вызываем сразу при загрузке страницы
     initSoundActivation();    
+
+    async function cleanOldMessages() {
+        if (!currentUser) return;
+        
+        const dayAgo = Date.now() - 24 * 60 * 60 * 1000;
+        const messagesRef = db.ref(`messages/${currentUser.id}`);
+        const snapshot = await messagesRef.once('value');
+        
+        let deleted = 0;
+        snapshot.forEach(chat => {
+            chat.forEach(msg => {
+                if (msg.val().timestamp < dayAgo) {
+                    msg.ref.remove();
+                    deleted++;
+                }
+            });
+        });
+        
+        if (deleted > 0) console.log(`🗑️ Удалено ${deleted} старых сообщений`);
+    }
+    
+    // Вызывать при загрузке страницы и каждые 30 минут
+    setInterval(() => currentUser && cleanOldMessages(), 30 * 60 * 1000);
     
 </script>
 </body>
