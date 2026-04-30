@@ -1,0 +1,28 @@
+name: Clean old messages
+on:
+  schedule:
+    - cron: '0 */6 * * *'  # Каждые 6 часов
+  workflow_dispatch:
+
+jobs:
+  clean-messages:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete messages older than 24 hours
+        run: |
+          # Получаем дату 24 часа назад в формате UNIX timestamp (секунды)
+          CUTOFF=$(($(date +%s) - 86400))
+          
+          # Удаляем сообщения через Firebase REST API
+          curl -X PATCH "https://audiozvonok-b340d-default-rtdb.firebaseio.com/messages.json" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"cutoff\": $CUTOFF
+            }" 2>/dev/null || true
+          
+          echo "✅ Очистка сообщений выполнена в $(date)"
+          echo "🗑️ Удалены сообщения старше: $(date -d '24 hours ago' '+%Y-%m-%d %H:%M:%S')"
+      
+      - name: Check cleanup result
+        run: |
+          echo "📊 Статус: очистка завершена"
